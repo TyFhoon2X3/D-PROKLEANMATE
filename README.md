@@ -1,5 +1,31 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Authentication setup
+
+Create `.env.local` with the Supabase project values:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+In Supabase Dashboard, configure:
+
+- Authentication > Providers > Email
+- Authentication > URL Configuration > Site URL
+- Redirect URLs: `http://localhost:3000/auth/callback` and the production callback URL
+- Run the SQL in `supabase/schema.sql` to create the bookings table and row-level security policies
+- To grant admin access, run the commented `update public.profiles ...` statement at the bottom of `supabase/schema.sql`
+
+Available auth routes:
+
+- `/login`
+- `/register`
+- `/forgot-password`
+- `/auth/reset-password`
+- `/booking` (requires an authenticated session)
+- `/admin` (requires a profile with `role = 'admin'`)
+
 ## Getting Started
 
 First, run the development server:
