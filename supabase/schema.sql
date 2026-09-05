@@ -14,6 +14,10 @@ create table if not exists public.bookings (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists one_active_booking_per_slot
+  on public.bookings (service_date, time_slot)
+  where status in ('pending', 'confirmed');
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text,
@@ -92,10 +96,34 @@ begin
 end;
 $$;
 
+create or replace function public.protect_booking_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    if old.status <> 'pending' then
+      raise exception 'รายการนี้ยืนยันแล้ว ไม่สามารถแก้ไขได้';
+    end if;
+    if new.status <> old.status then
+      raise exception 'ผู้ใช้ไม่สามารถเปลี่ยนสถานะรายการจองได้';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
 drop trigger if exists bookings_reject_past_date on public.bookings;
 create trigger bookings_reject_past_date
   before insert or update on public.bookings
   for each row execute function public.reject_past_booking();
+
+drop trigger if exists bookings_protect_changes on public.bookings;
+create trigger bookings_protect_changes
+  before update on public.bookings
+  for each row execute function public.protect_booking_changes();
 
 alter table public.bookings enable row level security;
 
@@ -122,7 +150,7 @@ drop policy if exists "Users can cancel their own bookings" on public.bookings;
 create policy "Users can cancel their own bookings"
   on public.bookings for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id and status = 'pending');
 
 drop policy if exists "Admins can view all bookings" on public.bookings;
 create policy "Admins can view all bookings"

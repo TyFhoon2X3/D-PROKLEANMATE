@@ -12,6 +12,7 @@ export default function BookingHistory() {
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -35,6 +36,18 @@ export default function BookingHistory() {
     loadBookings();
   }, [router]);
 
+  const cancelBooking = async (bookingId) => {
+    if (!window.confirm('ต้องการยกเลิกรายการจองนี้หรือไม่?')) return;
+    setCancellingId(bookingId);
+    const { error: cancelError } = await supabase.from('bookings').delete().eq('id', bookingId).eq('status', 'pending');
+    if (cancelError) {
+      setError(cancelError.message);
+    } else {
+      setBookings((currentBookings) => currentBookings.filter((booking) => booking.id !== bookingId));
+    }
+    setCancellingId(null);
+  };
+
   return (
     <main className="booking-page account-page">
       <header className="booking-header"><div className="booking-brand"><span className="brand-shield"><span className="brand-roof" /></span><span><strong>ดี-โปร คลีน แมท</strong><small>D-PRO KLEANMATE</small></span></div><Link href="/booking" className="header-back">จองบริการ</Link></header>
@@ -44,7 +57,7 @@ export default function BookingHistory() {
         {isLoading && <div className="empty-account">กำลังโหลดข้อมูล...</div>}
         {!isLoading && error && <div className="empty-account booking-error">{error}</div>}
         {!isLoading && !error && bookings.length === 0 && <div className="empty-account"><strong>ยังไม่มีรายการจอง</strong><span>เริ่มต้นจองบริการทำความสะอาดได้เลย</span><Link href="/booking" className="next-button">จองบริการ</Link></div>}
-        <div className="booking-history-list">{bookings.map((booking) => <article className="history-card" key={booking.id}><div className="history-card-top"><div><small>หมายเลขออเดอร์</small><strong>{booking.order_number}</strong></div><span className={`status-badge status-${booking.status}`}>{booking.status === 'pending' ? 'รอการยืนยัน' : booking.status}</span></div><h2>{booking.service_name}</h2><div className="history-meta"><span>📅 {formatDate(booking.service_date)}</span><span>⏰ {booking.time_slot} น.</span></div><p>{booking.service_address}</p><Link href={`/booking/${booking.id}`} className="history-link">ดูรายละเอียด →</Link></article>)}</div>
+        <div className="booking-history-list">{bookings.map((booking) => <article className="history-card" key={booking.id}><div className="history-card-top"><div><small>หมายเลขออเดอร์</small><strong>{booking.order_number}</strong></div><span className={`status-badge status-${booking.status}`}>{booking.status === 'pending' ? 'รอการยืนยัน' : booking.status}</span></div><h2>{booking.service_name}</h2><div className="history-meta"><span>📅 {formatDate(booking.service_date)}</span><span>⏰ {booking.time_slot} น.</span></div><p>{booking.service_address}</p><div className="history-actions"><Link href={`/booking/${booking.id}`} className="history-link">ดูรายละเอียด →</Link>{booking.status === 'pending' && <button type="button" className="cancel-booking-button" disabled={cancellingId === booking.id} onClick={() => cancelBooking(booking.id)}>{cancellingId === booking.id ? 'กำลังยกเลิก...' : 'ยกเลิกการจอง'}</button>}</div></article>)}</div>
       </section>
       <AccountNav active="orders" />
     </main>

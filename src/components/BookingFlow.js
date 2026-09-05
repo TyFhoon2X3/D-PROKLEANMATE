@@ -128,7 +128,9 @@ export default function BookingFlow() {
 
     setIsSaving(false);
     if (error) {
-      setBookingMessage(error.message.includes('bookings')
+      setBookingMessage(error.code === '23505'
+        ? 'ช่วงเวลานี้มีผู้จองแล้ว กรุณาเลือกวันหรือเวลาอื่น'
+        : error.message.includes('bookings')
         ? 'ยังไม่มีตาราง bookings ใน Supabase กรุณารัน SQL schema ที่ให้ไว้ใน supabase/schema.sql'
         : error.message);
       return;

@@ -743,6 +743,9 @@ button {
 .history-meta { display: flex; flex-wrap: wrap; gap: 13px; color: #4f4f4f; font-size: 13px; }
 .history-card p { margin: 12px 0 13px; color: #666; font-size: 13px; line-height: 1.5; }
 .history-link { color: #075094; font-size: 13px; font-weight: 700; text-decoration: none; }
+.history-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.cancel-booking-button { border: 1px solid #c44a4a; padding: 7px 10px; color: #b33b3b; background: #fff; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.cancel-booking-button:disabled { cursor: wait; opacity: .6; }
 .profile-card { padding: 27px 22px; background: #fff; border: 1px solid #e5e5e5; border-radius: 13px; text-align: center; }
 .profile-avatar { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 13px; color: #fff; background: #06478f; border-radius: 50%; font-size: 29px; font-weight: 700; }
 .profile-card h2 { margin: 0; color: #123d6d; font-size: 20px; }
@@ -755,6 +758,7 @@ button {
 .admin-entry-button { display: block; width: 100%; box-sizing: border-box; margin-top: 16px; padding: 13px; color: #fff; background: #06478f; border-radius: 8px; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; }
 .detail-card { padding: 17px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 3px 12px rgba(6, 47, 99, 0.05); }
 .detail-card > .history-card-top > strong { color: #123d6d; font-size: 18px; }
+.cancel-detail-button { width: 100%; margin-top: 16px; border: 1px solid #c44a4a; padding: 13px; color: #b33b3b; background: #fff; border-radius: 8px; font-weight: 700; }
 
 @media (min-width: 761px) {
   .booking-header {
