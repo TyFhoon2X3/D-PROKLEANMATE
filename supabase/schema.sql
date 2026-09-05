@@ -18,6 +18,22 @@ create unique index if not exists one_active_booking_per_slot
   on public.bookings (service_date, time_slot)
   where status in ('pending', 'confirmed');
 
+create or replace function public.get_unavailable_booking_slots(target_date date)
+returns table (time_slot text)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select b.time_slot
+  from public.bookings b
+  where b.service_date = target_date
+    and b.status in ('pending', 'confirmed');
+$$;
+
+revoke all on function public.get_unavailable_booking_slots(date) from public;
+grant execute on function public.get_unavailable_booking_slots(date) to authenticated;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text,

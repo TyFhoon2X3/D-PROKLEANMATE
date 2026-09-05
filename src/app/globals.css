@@ -676,6 +676,8 @@ button {
 .time-grid button { border: 0; padding: 10px; color: #111; background: #ededee; border-radius: 9px; font-size: 14px; font-weight: 700; }
 .time-grid button.selected { background: #f1bb37; }
 .time-grid button:disabled { cursor: not-allowed; color: #aaa; background: #e2e2e2; text-decoration: line-through; }
+.time-grid button.booked { color: #a44a4a; background: #f7dddd; text-decoration: line-through; }
+.booking-slot-note { margin: 8px 0 0; color: #687789; font-size: 13px; text-align: center; }
 
 .customer-form { display: grid; gap: 8px; }
 .customer-form label { margin-top: 6px; font-size: 14px; font-weight: 700; }

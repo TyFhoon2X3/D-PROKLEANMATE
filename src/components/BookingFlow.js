@@ -34,6 +34,8 @@ export default function BookingFlow() {
   const [selectedService, setSelectedService] = useState(0);
   const [selectedTime, setSelectedTime] = useState(1);
   const [selectedDate, setSelectedDate] = useState(today.day);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const currentDate = new Date();
     return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -81,10 +83,23 @@ export default function BookingFlow() {
   const selectedDateIsToday = calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() === today.month && selectedDate === today.day;
   const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
   const isSlotPast = (slot) => selectedDateIsToday && getSlotStartMinutes(slot) <= currentMinutes;
-  const hasAvailableTime = timeSlots.some((slot) => !isSlotPast(slot));
+  const isSlotBooked = (slot) => bookedSlots.includes(slot);
+  const hasAvailableTime = timeSlots.some((slot) => !isSlotPast(slot) && !isSlotBooked(slot));
   const isDatePast = (day) => calendarMonth.getFullYear() < today.year
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() < today.month)
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() === today.month && day < today.day);
+  const selectedDateIsPast = isDatePast(selectedDate);
+
+  useEffect(() => {
+    const loadBookedSlots = async () => {
+      setIsLoadingSlots(true);
+      const { data, error } = await supabase.rpc('get_unavailable_booking_slots', { target_date: selectedIsoDate });
+      setBookedSlots(error ? [] : (data || []).map((booking) => booking.time_slot));
+      setIsLoadingSlots(false);
+    };
+
+    if (!selectedDateIsPast) loadBookedSlots();
+  }, [selectedIsoDate, selectedDateIsPast]);
 
   const updateCustomer = (field, value) => {
     setCustomer((currentCustomer) => ({ ...currentCustomer, [field]: value }));
@@ -98,7 +113,7 @@ export default function BookingFlow() {
       return;
     }
 
-    if (isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime])) {
+    if (isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime]) || isSlotBooked(timeSlots[selectedTime])) {
       setBookingMessage('วันหรือช่วงเวลาที่เลือกผ่านไปแล้ว กรุณาเลือกเวลาใหม่');
       return;
     }
@@ -188,10 +203,11 @@ export default function BookingFlow() {
           </div>
           <h2 className="booking-label time-label">เลือกเวลา</h2>
           <div className="time-grid">
-            {timeSlots.map((time, index) => <button type="button" key={time} className={selectedTime === index ? 'selected' : ''} disabled={isSlotPast(time)} onClick={() => setSelectedTime(index)}>{time}</button>)}
+            {timeSlots.map((time, index) => <button type="button" key={time} className={`${selectedTime === index ? 'selected' : ''} ${isSlotBooked(time) ? 'booked' : ''}`} disabled={isSlotPast(time) || isSlotBooked(time) || isLoadingSlots} onClick={() => setSelectedTime(index)}>{isSlotBooked(time) ? 'จองแล้ว' : time}</button>)}
           </div>
-          {!hasAvailableTime && <p className="booking-error">วันนี้ไม่มีช่วงเวลาที่เหลือแล้ว กรุณาเลือกวันถัดไป</p>}
-          <button type="button" className="next-button" disabled={!hasAvailableTime || isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime])} onClick={nextStep}>ถัดไป</button>
+          {isLoadingSlots && <p className="booking-slot-note">กำลังตรวจสอบเวลาว่าง...</p>}
+          {!isLoadingSlots && !hasAvailableTime && <p className="booking-error">วันนี้ไม่มีช่วงเวลาที่ว่างแล้ว กรุณาเลือกวันถัดไป</p>}
+          <button type="button" className="next-button" disabled={isLoadingSlots || !hasAvailableTime || isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime]) || isSlotBooked(timeSlots[selectedTime])} onClick={nextStep}>ถัดไป</button>
         </>}
 
         {step === 3 && <>
