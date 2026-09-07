@@ -5,15 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-const services = [
-  { name: 'ทำความสะอาดบ้าน', price: 'เริ่มต้น 45 บาท/ตร.ม.', featured: true },
-  { name: 'ทำความสะอาดบ้านคอนโด', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
-  { name: 'ทำความสะอาดสำนักงาน', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
-  { name: 'Big Cleaning', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
-  { name: 'ขอโปไซน์', price: 'เริ่มต้น 1,500 บาท' },
-  { name: 'หลังน้ำท่วม', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
-];
-
 const timeSlots = ['08:00-10:00', '10:00-12:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
 const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
@@ -31,6 +22,7 @@ export default function BookingFlow() {
   const router = useRouter();
   const today = getToday();
   const [step, setStep] = useState(1);
+  const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(0);
   const [selectedTime, setSelectedTime] = useState(1);
   const [selectedDate, setSelectedDate] = useState(today.day);
@@ -45,6 +37,16 @@ export default function BookingFlow() {
   const [bookingMessage, setBookingMessage] = useState('');
   const [orderNumber, setOrderNumber] = useState('DP0000');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '', address: '' });
+
+  useEffect(() => {
+    const loadServices = async () => {
+      const { data, error } = await supabase.from('services').select('*').eq('is_active', true).order('sort_order').order('created_at');
+      if (!error) setServices(data || []);
+      else setBookingMessage(error.message.includes('services') ? 'ยังไม่มีรายการบริการ กรุณาให้ผู้ดูแลรัน SQL schema ก่อน' : error.message);
+    };
+
+    loadServices();
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -119,6 +121,11 @@ export default function BookingFlow() {
     }
 
     setIsSaving(true);
+    if (!services[selectedService]) {
+      setBookingMessage('กรุณาเลือกบริการ');
+      setIsSaving(false);
+      return;
+    }
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
       router.replace('/login');
@@ -176,14 +183,14 @@ export default function BookingFlow() {
           <StepIndicator activeStep={step} onStepClick={goToStep} />
           <div className="service-list">
             {services.map((service, index) => (
-              <button type="button" className={`service-option ${selectedService === index ? 'selected' : ''}`} key={service.name} onClick={() => setSelectedService(index)}>
+              <button type="button" className={`service-option ${selectedService === index ? 'selected' : ''}`} key={service.id} onClick={() => setSelectedService(index)}>
                 <span className={`service-image service-image-${index}`} aria-hidden="true" />
                 <span className="service-copy"><strong>{service.name}</strong><small>{service.price}</small></span>
                 <span className="service-radio" aria-hidden="true" />
               </button>
             ))}
           </div>
-          <button type="button" className="next-button" onClick={nextStep}>ถัดไป</button>
+          <button type="button" className="next-button" disabled={!services.length} onClick={nextStep}>ถัดไป</button>
         </>}
 
         {step === 2 && <>
