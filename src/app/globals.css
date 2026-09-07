@@ -69,11 +69,19 @@ body {
 .service-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-top: 18px; }
 .service-form input { min-width: 0; border: 1px solid #d6dee6; padding: 11px 13px; color: #17324f; background: #fff; border-radius: 7px; outline: none; font-size: 13px; }
 .service-form button { border: 0; padding: 11px 18px; color: #062b55; background: #f1b82d; border-radius: 7px; font-size: 13px; font-weight: 700; }
+.service-form .service-cancel-button { color: #405268; background: #edf0f2; }
 .service-form button:disabled { cursor: wait; opacity: .65; }
 .service-admin-list { display: grid; gap: 8px; margin-top: 16px; }
 .service-admin-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; background: #f8fafb; border: 1px solid #edf0f2; border-radius: 7px; font-size: 13px; }
+.service-admin-details { display: grid; gap: 4px; min-width: 0; }
 .service-admin-item strong { color: #17324f; }
 .service-admin-item span { color: #718096; }
+.service-admin-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.service-admin-actions button { border: 1px solid #d6dee6; padding: 7px 9px; color: #405268; background: #fff; border-radius: 6px; font-size: 12px; }
+.service-admin-actions button:hover { border-color: #75a6d2; color: #075094; }
+.service-admin-actions .service-delete-button { color: #a33e3e; }
+.service-active-label { color: #a33e3e !important; font-size: 11px; font-weight: 700; }
+.service-active-label.active { color: #43805b !important; }
 
 @media (max-width: 760px) {
   .admin-header { align-items: flex-start; flex-direction: column; padding: 20px; }
@@ -86,6 +94,9 @@ body {
   .admin-stat-card strong { font-size: 25px; }
   .admin-toolbar { flex-direction: column; }
   .service-form { grid-template-columns: 1fr; }
+  .service-admin-item { align-items: stretch; flex-direction: column; }
+  .service-admin-actions { justify-content: flex-start; }
+  .service-admin-actions button { flex: 1; }
   .admin-table-wrap { overflow: visible; background: transparent; border: 0; box-shadow: none; }
   .admin-table { display: block; min-width: 0; }
   .admin-table thead { display: none; }

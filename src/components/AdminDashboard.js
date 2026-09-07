@@ -12,7 +12,8 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState([]);
   const [services, setServices] = useState([]);
   const [serviceForm, setServiceForm] = useState({ name: '', price: '' });
-  const [isAddingService, setIsAddingService] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState(null);
+  const [isSavingService, setIsSavingService] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -62,24 +63,60 @@ export default function AdminDashboard() {
     setBookings((currentBookings) => currentBookings.map((booking) => booking.id === id ? { ...booking, status } : booking));
   };
 
-  const addService = async (event) => {
+  const saveService = async (event) => {
     event.preventDefault();
     if (!serviceForm.name.trim() || !serviceForm.price.trim()) return;
 
-    setIsAddingService(true);
-    const { data, error } = await supabase.from('services').insert({
-      name: serviceForm.name.trim(),
-      price: serviceForm.price.trim(),
-      sort_order: services.length,
-    }).select().single();
-    setIsAddingService(false);
+    setIsSavingService(true);
+    const serviceData = { name: serviceForm.name.trim(), price: serviceForm.price.trim() };
+    const query = editingServiceId
+      ? supabase.from('services').update(serviceData).eq('id', editingServiceId).select().single()
+      : supabase.from('services').insert({ ...serviceData, sort_order: services.length }).select().single();
+    const { data, error } = await query;
+    setIsSavingService(false);
     if (error) {
       setMessage(error.message);
       return;
     }
-    setServices((currentServices) => [...currentServices, data]);
+    setServices((currentServices) => editingServiceId
+      ? currentServices.map((service) => service.id === editingServiceId ? data : service)
+      : [...currentServices, data]);
     setServiceForm({ name: '', price: '' });
-    setMessage('เพิ่มบริการเรียบร้อยแล้ว');
+    setEditingServiceId(null);
+    setMessage(editingServiceId ? 'แก้ไขบริการเรียบร้อยแล้ว' : 'เพิ่มบริการเรียบร้อยแล้ว');
+  };
+
+  const editService = (service) => {
+    setEditingServiceId(service.id);
+    setServiceForm({ name: service.name, price: service.price });
+    setMessage('');
+  };
+
+  const cancelEditingService = () => {
+    setEditingServiceId(null);
+    setServiceForm({ name: '', price: '' });
+  };
+
+  const toggleService = async (service) => {
+    const { data, error } = await supabase.from('services').update({ is_active: !service.is_active }).eq('id', service.id).select().single();
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setServices((currentServices) => currentServices.map((currentService) => currentService.id === service.id ? data : currentService));
+  };
+
+  const deleteService = async (service) => {
+    if (!window.confirm(`ต้องการลบบริการ "${service.name}" ใช่หรือไม่?`)) return;
+
+    const { error } = await supabase.from('services').delete().eq('id', service.id);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setServices((currentServices) => currentServices.filter((currentService) => currentService.id !== service.id));
+    if (editingServiceId === service.id) cancelEditingService();
+    setMessage('ลบบริการเรียบร้อยแล้ว');
   };
 
   const signOut = async () => {
@@ -99,12 +136,13 @@ export default function AdminDashboard() {
         <div className="admin-stat-grid"><StatCard label="รายการทั้งหมด" value={bookings.length} /><StatCard label="รอการยืนยัน" value={counts.pending || 0} accent="pending" /><StatCard label="ยืนยันแล้ว" value={counts.confirmed || 0} accent="confirmed" /><StatCard label="เสร็จสิ้น" value={counts.completed || 0} accent="completed" /></div>
         <section className="admin-services">
           <div className="admin-section-heading"><div><h2>บริการ</h2><p>เพิ่มบริการใหม่เพื่อให้ลูกค้าเลือกในหน้าจอง</p></div></div>
-          <form className="service-form" onSubmit={addService}>
+          <form className="service-form" onSubmit={saveService}>
             <input aria-label="ชื่อบริการ" placeholder="ชื่อบริการ" value={serviceForm.name} onChange={(event) => setServiceForm({ ...serviceForm, name: event.target.value })} />
             <input aria-label="รายละเอียดราคา" placeholder="เช่น เริ่มต้น 45 บาท/ตร.ม." value={serviceForm.price} onChange={(event) => setServiceForm({ ...serviceForm, price: event.target.value })} />
-            <button type="submit" disabled={isAddingService}>{isAddingService ? 'กำลังเพิ่ม...' : 'เพิ่มบริการ'}</button>
+            <button type="submit" disabled={isSavingService}>{isSavingService ? 'กำลังบันทึก...' : editingServiceId ? 'บันทึกการแก้ไข' : 'เพิ่มบริการ'}</button>
+            {editingServiceId && <button type="button" className="service-cancel-button" onClick={cancelEditingService}>ยกเลิก</button>}
           </form>
-          <div className="service-admin-list">{services.map((service) => <div className="service-admin-item" key={service.id}><strong>{service.name}</strong><span>{service.price}</span></div>)}{services.length === 0 && <p className="admin-empty">ยังไม่มีบริการ</p>}</div>
+          <div className="service-admin-list">{services.map((service) => <div className="service-admin-item" key={service.id}><div className="service-admin-details"><strong>{service.name}</strong><span>{service.price}</span></div><div className="service-admin-actions"><span className={`service-active-label ${service.is_active ? 'active' : ''}`}>{service.is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span><button type="button" onClick={() => editService(service)}>แก้ไข</button><button type="button" onClick={() => toggleService(service)}>{service.is_active ? 'ปิด' : 'เปิด'}</button><button type="button" className="service-delete-button" onClick={() => deleteService(service)}>ลบ</button></div></div>)}{services.length === 0 && <p className="admin-empty">ยังไม่มีบริการ</p>}</div>
         </section>
         <div className="admin-toolbar"><input aria-label="ค้นหารายการจอง" placeholder="ค้นหาเลขออเดอร์ ชื่อลูกค้า หรือบริการ" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="กรองสถานะ" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="pending">รอการยืนยัน</option><option value="confirmed">ยืนยันแล้ว</option><option value="completed">เสร็จสิ้น</option><option value="cancelled">ยกเลิก</option></select></div>
         {message && <p className="booking-error">{message}</p>}
