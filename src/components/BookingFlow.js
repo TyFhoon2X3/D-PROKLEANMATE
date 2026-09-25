@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-const services = [
+const defaultServices = [
   { name: 'ทำความสะอาดบ้าน', price: 'เริ่มต้น 45 บาท/ตร.ม.', featured: true },
   { name: 'ทำความสะอาดบ้านคอนโด', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
   { name: 'ทำความสะอาดสำนักงาน', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
@@ -14,7 +14,6 @@ const services = [
   { name: 'หลังน้ำท่วม', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
 ];
 
-const timeSlots = ['08:00-10:00', '10:00-12:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
 const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 const getToday = () => {
@@ -22,20 +21,13 @@ const getToday = () => {
   return { year: today.getFullYear(), month: today.getMonth(), day: today.getDate() };
 };
 
-const getSlotStartMinutes = (slot) => {
-  const [hours, minutes] = slot.split(':').map(Number);
-  return hours * 60 + minutes;
-};
-
 export default function BookingFlow() {
   const router = useRouter();
   const today = getToday();
   const [step, setStep] = useState(1);
+  const [services, setServices] = useState(defaultServices);
   const [selectedService, setSelectedService] = useState(0);
-  const [selectedTime, setSelectedTime] = useState(1);
   const [selectedDate, setSelectedDate] = useState(today.day);
-  const [bookedSlots, setBookedSlots] = useState([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const currentDate = new Date();
     return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -45,6 +37,7 @@ export default function BookingFlow() {
   const [bookingMessage, setBookingMessage] = useState('');
   const [orderNumber, setOrderNumber] = useState('DP0000');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '', address: '' });
+  const [paymentMethod, setPaymentMethod] = useState('qr');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -58,6 +51,14 @@ export default function BookingFlow() {
 
     checkSession();
   }, [router]);
+
+  useEffect(() => {
+    const loadServices = async () => {
+      const { data } = await supabase.from('services').select('name, starting_price').eq('is_active', true).order('created_at');
+      if (data?.length) setServices(data.map((service) => ({ name: service.name, price: service.starting_price })));
+    };
+    loadServices();
+  }, []);
 
   const nextStep = () => setStep((currentStep) => Math.min(currentStep + 1, 4));
   const previousStep = () => setStep((currentStep) => Math.max(currentStep - 1, 1));
@@ -80,27 +81,9 @@ export default function BookingFlow() {
   const firstDayOfMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
   const monthLabel = `${thaiMonths[calendarMonth.getMonth()]} ${calendarMonth.getFullYear() + 543}`;
   const selectedIsoDate = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
-  const selectedDateIsToday = calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() === today.month && selectedDate === today.day;
-  const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-  const isSlotPast = (slot) => selectedDateIsToday && getSlotStartMinutes(slot) <= currentMinutes;
-  const isSlotBooked = (slot) => bookedSlots.includes(slot);
-  const hasAvailableTime = timeSlots.some((slot) => !isSlotPast(slot) && !isSlotBooked(slot));
   const isDatePast = (day) => calendarMonth.getFullYear() < today.year
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() < today.month)
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() === today.month && day < today.day);
-  const selectedDateIsPast = isDatePast(selectedDate);
-
-  useEffect(() => {
-    const loadBookedSlots = async () => {
-      setIsLoadingSlots(true);
-      const { data, error } = await supabase.rpc('get_unavailable_booking_slots', { target_date: selectedIsoDate });
-      setBookedSlots(error ? [] : (data || []).map((booking) => booking.time_slot));
-      setIsLoadingSlots(false);
-    };
-
-    if (!selectedDateIsPast) loadBookedSlots();
-  }, [selectedIsoDate, selectedDateIsPast]);
-
   const updateCustomer = (field, value) => {
     setCustomer((currentCustomer) => ({ ...currentCustomer, [field]: value }));
   };
@@ -108,13 +91,13 @@ export default function BookingFlow() {
   const saveBooking = async (event) => {
     event.preventDefault();
     setBookingMessage('');
-    if (!customer.name || !customer.phone || !customer.address) {
+    if (!customer.name || !customer.phone || !customer.address || !paymentMethod) {
       setBookingMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');
       return;
     }
 
-    if (isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime]) || isSlotBooked(timeSlots[selectedTime])) {
-      setBookingMessage('วันหรือช่วงเวลาที่เลือกผ่านไปแล้ว กรุณาเลือกเวลาใหม่');
+    if (isDatePast(selectedDate)) {
+      setBookingMessage('วันที่เลือกผ่านไปแล้ว กรุณาเลือกวันใหม่');
       return;
     }
 
@@ -132,19 +115,19 @@ export default function BookingFlow() {
       user_id: userData.user.id,
       service_name: selectedServiceData.name,
       service_price: selectedServiceData.price,
-      service_date: selectedIsoDate,
-      time_slot: timeSlots[selectedTime],
+      site_visit_date: selectedIsoDate,
       customer_name: customer.name,
       customer_phone: customer.phone,
       customer_email: customer.email || userData.user.email,
       service_address: customer.address,
+      payment_method: paymentMethod,
       status: 'pending',
     });
 
     setIsSaving(false);
     if (error) {
-      setBookingMessage(error.code === '23505'
-        ? 'ช่วงเวลานี้มีผู้จองแล้ว กรุณาเลือกวันหรือเวลาอื่น'
+      setBookingMessage(error.message.includes('one_active_site_visit_per_date')
+        ? 'วันที่เข้าประเมินสถานที่นี้มีผู้จองแล้ว กรุณาเลือกวันอื่น'
         : error.message.includes('bookings')
         ? 'ยังไม่มีตาราง bookings ใน Supabase กรุณารัน SQL schema ที่ให้ไว้ใน supabase/schema.sql'
         : error.message);
@@ -187,9 +170,9 @@ export default function BookingFlow() {
         </>}
 
         {step === 2 && <>
-          <h1>เลือกวันและเวลา</h1>
+          <h1>เลือกวันที่เข้าประเมินสถานที่</h1>
           <StepIndicator activeStep={step} onStepClick={goToStep} />
-          <h2 className="booking-label">เลือกวันที่ใช้บริการ</h2>
+          <h2 className="booking-label">เลือกวันที่เข้าประเมินสถานที่</h2>
           <div className="calendar">
             <div className="calendar-heading"><button type="button" onClick={() => changeMonth(-1)} aria-label="เดือนก่อนหน้า">‹</button><strong>{monthLabel}</strong><button type="button" onClick={() => changeMonth(1)} aria-label="เดือนถัดไป">›</button></div>
             <div className="calendar-week"><span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span></div>
@@ -201,13 +184,7 @@ export default function BookingFlow() {
               })}
             </div>
           </div>
-          <h2 className="booking-label time-label">เลือกเวลา</h2>
-          <div className="time-grid">
-            {timeSlots.map((time, index) => <button type="button" key={time} className={`${selectedTime === index ? 'selected' : ''} ${isSlotBooked(time) ? 'booked' : ''}`} disabled={isSlotPast(time) || isSlotBooked(time) || isLoadingSlots} onClick={() => setSelectedTime(index)}>{isSlotBooked(time) ? 'จองแล้ว' : time}</button>)}
-          </div>
-          {isLoadingSlots && <p className="booking-slot-note">กำลังตรวจสอบเวลาว่าง...</p>}
-          {!isLoadingSlots && !hasAvailableTime && <p className="booking-error">วันนี้ไม่มีช่วงเวลาที่ว่างแล้ว กรุณาเลือกวันถัดไป</p>}
-          <button type="button" className="next-button" disabled={isLoadingSlots || !hasAvailableTime || isDatePast(selectedDate) || isSlotPast(timeSlots[selectedTime]) || isSlotBooked(timeSlots[selectedTime])} onClick={nextStep}>ถัดไป</button>
+          <button type="button" className="next-button" disabled={isDatePast(selectedDate)} onClick={nextStep}>ถัดไป</button>
         </>}
 
         {step === 3 && <>
@@ -223,6 +200,11 @@ export default function BookingFlow() {
             <input id="customer-email" type="email" placeholder="กรอกอีเมล (ถ้ามี)" value={customer.email} onChange={(event) => updateCustomer('email', event.target.value)} />
             <label htmlFor="customer-address">ที่อยู่สำหรับให้บริการ <b>*</b></label>
             <textarea id="customer-address" placeholder="กรอกที่อยู่" value={customer.address} onChange={(event) => updateCustomer('address', event.target.value)} />
+            <label htmlFor="payment-method">วิธีชำระเงิน <b>*</b></label>
+            <select id="payment-method" className="payment-method-select" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
+              <option value="qr">ชำระผ่าน QR Code</option>
+              <option value="cash">ชำระเงินสด</option>
+            </select>
             {bookingMessage && <p className="booking-error" role="alert">{bookingMessage}</p>}
             <button type="submit" className="next-button" disabled={isSaving}>{isSaving ? 'กำลังบันทึก...' : 'ถัดไป'}</button>
           </form>
@@ -237,8 +219,9 @@ export default function BookingFlow() {
             <div><strong>{services[selectedService].name}</strong><small>{services[selectedService].price}</small></div>
           </div>
           <div className="booking-details-grid">
-            <div><small>วันที่ใช้บริการ</small><strong>{selectedDate} {thaiMonths[calendarMonth.getMonth()]} {calendarMonth.getFullYear() + 543}</strong></div>
-            <div><small>ช่วงเวลา</small><strong>{timeSlots[selectedTime]} น.</strong></div>
+            <div><small>วันที่เข้าประเมินสถานที่</small><strong>{selectedDate} {thaiMonths[calendarMonth.getMonth()]} {calendarMonth.getFullYear() + 543}</strong></div>
+            <div><small>วันที่เข้าทำความสะอาด</small><strong>รอแอดมินกำหนด</strong></div>
+            <div><small>วิธีชำระเงิน</small><strong>{paymentMethod === 'qr' ? 'QR Code' : 'เงินสด'}</strong></div>
             <div><small>ชื่อผู้จอง</small><strong>{customer.name || '-'}</strong></div>
             <div><small>เบอร์โทรศัพท์</small><strong>{customer.phone || '-'}</strong></div>
             <div className="full-detail"><small>ที่อยู่ให้บริการ</small><strong>{customer.address || '-'}</strong></div>

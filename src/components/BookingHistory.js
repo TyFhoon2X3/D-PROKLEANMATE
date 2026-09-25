@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const formatDate = (date) => new Intl.DateTimeFormat('th-TH', { dateStyle: 'long' }).format(new Date(`${date}T00:00:00`));
+const statusLabels = { pending: 'รอการยืนยัน', quote: 'ประเมินราคา', awaiting_payment: 'รอชำระเงิน', confirmed: 'ยืนยันแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
 
 export default function BookingHistory() {
   const router = useRouter();
@@ -57,7 +58,7 @@ export default function BookingHistory() {
         {isLoading && <div className="empty-account">กำลังโหลดข้อมูล...</div>}
         {!isLoading && error && <div className="empty-account booking-error">{error}</div>}
         {!isLoading && !error && bookings.length === 0 && <div className="empty-account"><strong>ยังไม่มีรายการจอง</strong><span>เริ่มต้นจองบริการทำความสะอาดได้เลย</span><Link href="/booking" className="next-button">จองบริการ</Link></div>}
-        <div className="booking-history-list">{bookings.map((booking) => <article className="history-card" key={booking.id}><div className="history-card-top"><div><small>หมายเลขออเดอร์</small><strong>{booking.order_number}</strong></div><span className={`status-badge status-${booking.status}`}>{booking.status === 'pending' ? 'รอการยืนยัน' : booking.status}</span></div><h2>{booking.service_name}</h2><div className="history-meta"><span>📅 {formatDate(booking.service_date)}</span><span>⏰ {booking.time_slot} น.</span></div><p>{booking.service_address}</p><div className="history-actions"><Link href={`/booking/${booking.id}`} className="history-link">ดูรายละเอียด →</Link>{booking.status === 'pending' && <button type="button" className="cancel-booking-button" disabled={cancellingId === booking.id} onClick={() => cancelBooking(booking.id)}>{cancellingId === booking.id ? 'กำลังยกเลิก...' : 'ยกเลิกการจอง'}</button>}</div></article>)}</div>
+        <div className="booking-history-list">{bookings.map((booking) => <article className="history-card" key={booking.id}><div className="history-card-top"><div><small>หมายเลขออเดอร์</small><strong>{booking.order_number}</strong></div><span className={`status-badge status-${booking.status}`}>{statusLabels[booking.status] || booking.status}</span></div><h2>{booking.service_name}</h2><div className="history-meta"><span>เข้าประเมิน: {booking.site_visit_date ? formatDate(booking.site_visit_date) : '-'}</span><span>ทำความสะอาด: {booking.service_date ? formatDate(booking.service_date) : 'รอแอดมินกำหนด'}</span><span>ชำระ: {booking.payment_method === 'cash' ? 'เงินสด' : 'QR Code'}</span></div><p>{booking.service_address}</p><div className="history-price">ราคา: {booking.admin_price != null ? `${Number(booking.admin_price).toLocaleString('th-TH')} บาท` : 'รอประเมินราคา'}</div><div className="history-actions"><Link href={`/booking/${booking.id}`} className="history-link">ดูรายละเอียด →</Link>{booking.status === 'pending' && <button type="button" className="cancel-booking-button" disabled={cancellingId === booking.id} onClick={() => cancelBooking(booking.id)}>{cancellingId === booking.id ? 'กำลังยกเลิก...' : 'ยกเลิกการจอง'}</button>}</div></article>)}</div>
       </section>
       <AccountNav active="orders" />
     </main>
