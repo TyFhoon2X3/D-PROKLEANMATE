@@ -69,6 +69,15 @@ body {
 .admin-slip-link { color: #075094; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .admin-no-slip { color: #8995a2; font-size: 12px; white-space: nowrap; }
 .admin-empty { padding: 50px; color: #718096; text-align: center; }
+.admin-services { display: grid; gap: 14px; margin-bottom: 18px; padding: 20px; background: #fff; border: 1px solid #e1e7ec; border-radius: 10px; box-shadow: 0 4px 16px rgba(6,43,85,.04); }
+.admin-services h2 { margin: 0; color: #062b55; font-size: 18px; }
+.admin-service-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) auto; gap: 10px; }
+.admin-service-form input, .admin-service-row input:not([type="checkbox"]) { min-width: 0; border: 1px solid #d6dee6; padding: 10px 12px; color: #17324f; background: #fff; border-radius: 7px; outline: none; font-size: 13px; }
+.admin-service-form button { border: 0; padding: 10px 18px; color: #fff; background: #06478f; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.admin-service-list { display: grid; gap: 8px; }
+.admin-service-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) auto; gap: 10px; align-items: center; padding-top: 9px; border-top: 1px solid #edf0f2; }
+.admin-service-row label { color: #405268; font-size: 13px; white-space: nowrap; }
+.admin-service-row label input { margin-right: 6px; accent-color: #06478f; }
 
 @media (max-width: 760px) {
   .admin-header { align-items: flex-start; flex-direction: column; padding: 20px; }
@@ -80,6 +89,8 @@ body {
   .admin-stat-card { padding: 14px; }
   .admin-stat-card strong { font-size: 25px; }
   .admin-toolbar { flex-direction: column; }
+  .admin-service-form, .admin-service-row { grid-template-columns: 1fr; }
+  .admin-service-row label { padding-bottom: 3px; }
 }
 
 .onboarding-page {

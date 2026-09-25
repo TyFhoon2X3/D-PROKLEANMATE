@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-const services = [
+const defaultServices = [
   { name: 'ทำความสะอาดบ้าน', price: 'เริ่มต้น 45 บาท/ตร.ม.', featured: true },
   { name: 'ทำความสะอาดบ้านคอนโด', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
   { name: 'ทำความสะอาดสำนักงาน', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
@@ -25,6 +25,7 @@ export default function BookingFlow() {
   const router = useRouter();
   const today = getToday();
   const [step, setStep] = useState(1);
+  const [services, setServices] = useState(defaultServices);
   const [selectedService, setSelectedService] = useState(0);
   const [selectedDate, setSelectedDate] = useState(today.day);
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -36,6 +37,7 @@ export default function BookingFlow() {
   const [bookingMessage, setBookingMessage] = useState('');
   const [orderNumber, setOrderNumber] = useState('DP0000');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '', address: '' });
+  const [paymentMethod, setPaymentMethod] = useState('qr');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -52,8 +54,8 @@ export default function BookingFlow() {
 
   useEffect(() => {
     const loadServices = async () => {
-      const { data } = await supabase.from('services').select('name, starting_price').eq('is_active', true).order('created_at');
-      if (data?.length) setServices(data.map((service) => ({ name: service.name, price: service.starting_price })));
+      const { data } = await supabase.from('services').select('id, name, starting_price, price').eq('is_active', true).order('created_at');
+      if (data?.length) setServices(data.map((service) => ({ id: service.id, name: service.name, price: service.starting_price || service.price })));
     };
     loadServices();
   }, []);
@@ -162,7 +164,7 @@ export default function BookingFlow() {
           <StepIndicator activeStep={step} onStepClick={goToStep} />
           <div className="service-list">
             {services.map((service, index) => (
-              <button type="button" className={`service-option ${selectedService === index ? 'selected' : ''}`} key={service.id} onClick={() => setSelectedService(index)}>
+              <button type="button" className={`service-option ${selectedService === index ? 'selected' : ''}`} key={service.id || service.name} onClick={() => setSelectedService(index)}>
                 <span className={`service-image service-image-${index}`} aria-hidden="true" />
                 <span className="service-copy"><strong>{service.name}</strong><small>{service.price}</small></span>
                 <span className="service-radio" aria-hidden="true" />
