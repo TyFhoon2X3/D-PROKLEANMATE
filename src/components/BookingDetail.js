@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import QRCode from 'qrcode';
 
 const statusLabels = { pending: 'รอการยืนยัน', quote: 'ประเมินราคา', awaiting_payment: 'รอชำระเงิน', confirmed: 'ยืนยันแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
@@ -40,20 +39,18 @@ export default function BookingDetail() {
 
   useEffect(() => {
     const loadBooking = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
+      const sessionResponse = await fetch('/api/auth/me');
+      const { user } = await sessionResponse.json();
+      if (!user) {
         router.replace('/login');
         return;
       }
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).maybeSingle();
-      const admin = profile?.role === 'admin';
-      setIsAdmin(admin);
-      let bookingQuery = supabase.from('bookings').select('*').eq('id', id);
-      if (!admin) bookingQuery = bookingQuery.eq('user_id', userData.user.id);
-      const { data, error: queryError } = await bookingQuery.single();
-      if (queryError) setError('ไม่พบรายการจองนี้');
-      setBooking(data);
+      const response = await fetch(`/api/bookings/${id}`);
+      const result = await response.json();
+      setIsAdmin(result.isAdmin || false);
+      if (!response.ok) setError(result.error || 'ไม่พบรายการจองนี้');
+      setBooking(result.booking || null);
     };
     if (id) loadBooking();
   }, [id, router]);
@@ -74,8 +71,9 @@ export default function BookingDetail() {
   const cancelBooking = async () => {
     if (!window.confirm('ต้องการยกเลิกรายการจองนี้หรือไม่?')) return;
     setIsCancelling(true);
-    const { error: cancelError } = await supabase.from('bookings').delete().eq('id', booking.id).eq('status', 'pending');
-    if (cancelError) setError(cancelError.message);
+    const response = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) setError(result.error || 'ยกเลิกรายการจองไม่สำเร็จ');
     else router.replace(isAdmin ? '/admin' : '/bookings');
     setIsCancelling(false);
   };
@@ -93,28 +91,13 @@ export default function BookingDetail() {
       return;
     }
     setIsUploadingSlip(true);
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      setSlipMessage('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
-      setIsUploadingSlip(false);
-      return;
-    }
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const path = `${booking.user_id}/${booking.id}-${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from('payment-slips').upload(path, file, { upsert: false, contentType: file.type });
-    if (uploadError) {
-      setSlipMessage(`อัปโหลดไม่สำเร็จ: ${uploadError.message}`);
-      setIsUploadingSlip(false);
-      return;
-    }
-    const { data: publicUrlData } = supabase.storage.from('payment-slips').getPublicUrl(path);
-    let updateQuery = supabase.from('bookings').update({ payment_slip_url: publicUrlData.publicUrl }).eq('id', booking.id).eq('status', 'awaiting_payment');
-    if (!isAdmin) updateQuery = updateQuery.eq('user_id', userData.user.id);
-    const { data: updatedBooking, error: updateError } = await updateQuery.select('payment_slip_url').maybeSingle();
-    if (updateError) setSlipMessage(`บันทึกสลิปไม่สำเร็จ: ${updateError.message}`);
-    else if (!updatedBooking) setSlipMessage('บันทึกสลิปไม่สำเร็จ กรุณารัน schema.sql ล่าสุดบน Supabase แล้วลองใหม่');
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`/api/bookings/${booking.id}/slip`, { method: 'POST', body: formData });
+    const result = await response.json();
+    if (!response.ok) setSlipMessage(`อัปโหลดไม่สำเร็จ: ${result.error || 'เกิดข้อผิดพลาด'}`);
     else {
-      setBooking((currentBooking) => ({ ...currentBooking, payment_slip_url: updatedBooking.payment_slip_url }));
+      setBooking((currentBooking) => ({ ...currentBooking, payment_slip_url: `/api/bookings/${booking.id}/slip` }));
       setSlipMessage('แนบสลิปเรียบร้อยแล้ว');
     }
     setIsUploadingSlip(false);

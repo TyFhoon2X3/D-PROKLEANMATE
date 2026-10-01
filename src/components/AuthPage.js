@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 
 export default function AuthPage({ initialMode = 'login', initialRecovery = false }) {
   const [fullName, setFullName] = useState('');
@@ -25,8 +24,9 @@ export default function AuthPage({ initialMode = 'login', initialRecovery = fals
     if (recoveryMode) return;
 
     const redirectAuthenticatedUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      const response = await fetch('/api/auth/me');
+      const { user } = await response.json();
+      if (user) {
         router.replace('/booking');
         return;
       }
@@ -37,18 +37,6 @@ export default function AuthPage({ initialMode = 'login', initialRecovery = fals
   }, [recoveryMode, router]);
 
   const getAuthErrorMessage = (error) => {
-    if (error?.code === 'validation_failed' && error?.message?.includes('provider is not enabled')) {
-      return 'ยังไม่ได้เปิด Google Login ใน Supabase Dashboard กรุณาเปิด Authentication > Providers > Google';
-    }
-    if (error?.code === 'invalid_credentials' || error?.message === 'Invalid login credentials') {
-      return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หากยังไม่มีบัญชีให้สมัครสมาชิกก่อน';
-    }
-    if (error?.code === 'email_not_confirmed' || error?.message === 'Email not confirmed') {
-      return 'กรุณายืนยันอีเมลจากข้อความที่ส่งไปก่อนเข้าสู่ระบบ';
-    }
-    if (error?.code === 'user_already_exists') {
-      return 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ';
-    }
     return error?.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
   };
 
@@ -63,10 +51,13 @@ export default function AuthPage({ initialMode = 'login', initialRecovery = fals
 
     if (recoveryMode) {
       setIsLoading(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-      setMessage(error ? { type: 'error', text: getAuthErrorMessage(error) } : { type: 'success', text: 'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว' });
+      const result = await response.json();
+      setMessage(!response.ok ? { type: 'error', text: getAuthErrorMessage({ message: result.error }) } : { type: 'success', text: 'หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านให้' });
       setIsLoading(false);
       return;
     }
@@ -82,14 +73,14 @@ export default function AuthPage({ initialMode = 'login', initialRecovery = fals
     }
 
     setIsLoading(true);
-    const result = isRegistering
-      ? await supabase.auth.signUp({ email: email.trim().toLowerCase(), password, options: { data: { full_name: fullName, phone, username } } })
-      : await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-
-    if (result.error) {
-      setMessage({ type: 'error', text: getAuthErrorMessage(result.error) });
-    } else if (isRegistering) {
-      setMessage({ type: 'success', text: 'สมัครสมาชิกสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี' });
+    const response = await fetch(`/api/auth/${isRegistering ? 'register' : 'login'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password, fullName, phone, username }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setMessage({ type: 'error', text: getAuthErrorMessage({ message: result.error }) });
     } else {
       router.push('/booking');
     }
@@ -114,7 +105,7 @@ export default function AuthPage({ initialMode = 'login', initialRecovery = fals
         <div className="auth-header">
           <div className="mobile-logo brand-logo" aria-hidden="true"><span className="brand-shield"><span className="brand-roof" /></span><span className="brand-name">D-PROKLEANMATE</span></div>
           <h2 id="auth-title">{recoveryMode ? 'ลืมรหัสผ่าน' : isRegistering ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}</h2>
-          <p>{recoveryMode ? 'กรอกอีเมลหรือเบอร์โทรศัพท์ที่คุณใช้ลงทะเบียน' : isRegistering ? 'Create an Account' : ''}</p>
+          <p>{recoveryMode ? 'กรอกอีเมลที่คุณใช้ลงทะเบียน' : isRegistering ? 'Create an Account' : ''}</p>
         </div>
 
         {!recoveryMode && <div className="mode-switch" role="tablist" aria-label="เลือกประเภทการใช้งาน"><Link href="/login" role="tab" aria-selected={!isRegistering} className={!isRegistering ? 'active' : ''}>เข้าสู่ระบบ</Link><Link href="/register" role="tab" aria-selected={isRegistering} className={isRegistering ? 'active' : ''}>สมัครสมาชิก</Link></div>}

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordForm() {
   const router = useRouter();
@@ -10,6 +9,9 @@ export default function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [token] = useState(() => typeof window === 'undefined'
+    ? ''
+    : new URLSearchParams(window.location.search).get('token') || '');
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -26,9 +28,14 @@ export default function ResetPasswordForm() {
     }
 
     setIsLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setMessage({ type: 'error', text: result.error || 'เปลี่ยนรหัสผ่านไม่สำเร็จ' });
     } else {
       setMessage({ type: 'success', text: 'เปลี่ยนรหัสผ่านสำเร็จ กำลังกลับไปหน้าเข้าสู่ระบบ' });
       setTimeout(() => router.replace('/login'), 1200);

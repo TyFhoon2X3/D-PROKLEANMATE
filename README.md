@@ -1,62 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# D-ProKleanMate
 
-## Authentication setup
+## Local MySQL setup (XAMPP)
 
-Create `.env.local` with the Supabase project values:
+1. Start MySQL from the XAMPP Control Panel. Apache is not required for the Next.js app.
+2. Open phpMyAdmin and import `mysql/schema.sql`. The script creates the `dprokleanmate` database and its tables.
+3. Copy `.env.example` to `.env.local`, then set the database credentials and a private `AUTH_SECRET` of at least 32 characters. Set `APP_URL` to the app's public URL.
+4. Start the app with `npm run dev` and open `http://localhost:3000`.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+Payment slips are stored privately under `storage/payment-slips` and served through an authenticated API route. Back up this directory with the database. This local-disk storage is intended for a server with persistent disk, not ephemeral hosting such as a default Vercel deployment.
+
+## Email and password reset
+
+Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` in `.env.local` to enable password reset emails. Without these settings, the reset endpoint reports that SMTP is not configured.
+
+## Admin access
+
+After registering an account, grant it admin access in phpMyAdmin or the MySQL client:
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'your-email@example.com';
 ```
 
-In Supabase Dashboard, configure:
+## Existing Supabase data
 
-- Authentication > Providers > Email
-- Authentication > URL Configuration > Site URL
-- Redirect URLs: `http://localhost:3000/auth/callback` and the production callback URL
-- Run the SQL in `supabase/schema.sql` to create the bookings table and row-level security policies
-- To grant admin access, run the commented `update public.profiles ...` statement at the bottom of `supabase/schema.sql`
-
-Available auth routes:
-
-- `/login`
-- `/register`
-- `/forgot-password`
-- `/auth/reset-password`
-- `/booking` (requires an authenticated session)
-- `/admin` (requires a profile with `role = 'admin'`)
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The application no longer connects to Supabase. `supabase/schema.sql` is the old PostgreSQL schema and is not used by the app. This change does not copy existing users, bookings, or payment slips; migrate those separately before switching a live deployment.

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 const defaultServices = [
   { name: 'ทำความสะอาดบ้าน', price: 'เริ่มต้น 45 บาท/ตร.ม.', featured: true },
@@ -41,8 +40,9 @@ export default function BookingFlow() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      const response = await fetch('/api/auth/me');
+      const { user } = await response.json();
+      if (!user) {
         router.replace('/login');
         return;
       }
@@ -54,7 +54,8 @@ export default function BookingFlow() {
 
   useEffect(() => {
     const loadServices = async () => {
-      const { data } = await supabase.from('services').select('id, name, starting_price, price').eq('is_active', true).order('created_at');
+      const response = await fetch('/api/services');
+      const { services: data } = await response.json();
       if (data?.length) setServices(data.map((service) => ({ id: service.id, name: service.name, price: service.starting_price || service.price })));
     };
     loadServices();
@@ -107,39 +108,36 @@ export default function BookingFlow() {
       setIsSaving(false);
       return;
     }
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
+    const sessionResponse = await fetch('/api/auth/me');
+    const { user } = await sessionResponse.json();
+    if (!user) {
       router.replace('/login');
       return;
     }
 
-    const createdOrderNumber = `DP${Date.now().toString().slice(-8)}`;
     const selectedServiceData = services[selectedService];
-    const { error } = await supabase.from('bookings').insert({
-      order_number: createdOrderNumber,
-      user_id: userData.user.id,
+    const response = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
       service_name: selectedServiceData.name,
-      service_price: selectedServiceData.price,
       site_visit_date: selectedIsoDate,
       customer_name: customer.name,
       customer_phone: customer.phone,
-      customer_email: customer.email || userData.user.email,
+      customer_email: customer.email || user.email,
       service_address: customer.address,
       payment_method: paymentMethod,
-      status: 'pending',
+      }),
     });
+    const result = await response.json();
 
     setIsSaving(false);
-    if (error) {
-      setBookingMessage(error.message.includes('one_active_site_visit_per_date')
-        ? 'วันที่เข้าประเมินสถานที่นี้มีผู้จองแล้ว กรุณาเลือกวันอื่น'
-        : error.message.includes('bookings')
-        ? 'ยังไม่มีตาราง bookings ใน Supabase กรุณารัน SQL schema ที่ให้ไว้ใน supabase/schema.sql'
-        : error.message);
+    if (!response.ok) {
+      setBookingMessage(result.error || 'บันทึกการจองไม่สำเร็จ');
       return;
     }
 
-    setOrderNumber(createdOrderNumber);
+    setOrderNumber(result.order_number);
     setStep(4);
   };
 

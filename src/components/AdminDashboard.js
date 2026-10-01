@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 const statusLabels = { pending: 'รอการยืนยัน', quote: 'ประเมินราคา', awaiting_payment: 'รอชำระเงิน', confirmed: 'ยืนยันแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
 
@@ -23,23 +22,27 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const loadAdminData = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
+      const sessionResponse = await fetch('/api/auth/me');
+      const { user } = await sessionResponse.json();
+      if (!user) {
         router.replace('/login');
         return;
       }
-
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single();
-      if (profileError || profile?.role !== 'admin') {
+      if (user.role !== 'admin') {
         router.replace('/booking');
         return;
       }
 
-      const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      const { data: serviceData } = await supabase.from('services').select('*').order('created_at');
-      if (error) setMessage(error.message);
-      setBookings(data || []);
-      setServices(serviceData || []);
+      const [bookingResponse, serviceResponse] = await Promise.all([
+        fetch('/api/admin/bookings'),
+        fetch('/api/admin/services'),
+      ]);
+      const bookingResult = await bookingResponse.json();
+      const serviceResult = await serviceResponse.json();
+      if (!bookingResponse.ok) setMessage(bookingResult.error || 'โหลดรายการจองไม่สำเร็จ');
+      if (!serviceResponse.ok) setMessage(serviceResult.error || 'โหลดรายการบริการไม่สำเร็จ');
+      setBookings(bookingResult.bookings || []);
+      setServices(serviceResult.services || []);
       setIsLoading(false);
     };
 
@@ -54,18 +57,28 @@ export default function AdminDashboard() {
   }), [bookings, search, statusFilter]);
 
   const updateStatus = async (id, status) => {
-    const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
-    if (error) {
-      setMessage(error.message);
+    const response = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setMessage(result.error || 'แก้ไขรายการจองไม่สำเร็จ');
       return;
     }
     setBookings((currentBookings) => currentBookings.map((booking) => booking.id === id ? { ...booking, status } : booking));
   };
 
   const updateField = async (id, field, value) => {
-    const { error } = await supabase.from('bookings').update({ [field]: value || null }).eq('id', id);
-    if (error) {
-      setMessage(error.code === '23505' ? 'วันที่เข้าประเมินสถานที่นี้มีรายการจองแล้ว' : error.message);
+    const response = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value || null }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setMessage(result.error || 'แก้ไขรายการจองไม่สำเร็จ');
       return;
     }
     setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, [field]: value || null } : booking));
@@ -75,21 +88,31 @@ export default function AdminDashboard() {
     event.preventDefault();
     if (!newServiceName.trim() || !newServicePrice.trim()) return setMessage('กรุณากรอกชื่อบริการและราคา');
     const price = newServicePrice.trim();
-    const { data, error } = await supabase.from('services').insert({ name: newServiceName.trim(), price, starting_price: price }).select().single();
-    if (error) return setMessage(error.message);
-    setServices((current) => [...current, data]);
+    const response = await fetch('/api/admin/services', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newServiceName.trim(), price }),
+    });
+    const result = await response.json();
+    if (!response.ok) return setMessage(result.error || 'เพิ่มบริการไม่สำเร็จ');
+    setServices((current) => [...current, result.service]);
     setNewServiceName('');
     setNewServicePrice('');
   };
 
   const updateService = async (id, changes) => {
-    const { error } = await supabase.from('services').update(changes).eq('id', id);
-    if (error) return setMessage(error.message);
+    const response = await fetch(`/api/admin/services/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changes),
+    });
+    const result = await response.json();
+    if (!response.ok) return setMessage(result.error || 'แก้ไขบริการไม่สำเร็จ');
     setServices((current) => current.map((service) => service.id === id ? { ...service, ...changes } : service));
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
   };
 

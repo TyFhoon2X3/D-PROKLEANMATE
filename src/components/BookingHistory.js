@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 const formatDate = (date) => new Intl.DateTimeFormat('th-TH', { dateStyle: 'long' }).format(new Date(`${date}T00:00:00`));
 const statusLabels = { pending: 'รอการยืนยัน', quote: 'ประเมินราคา', awaiting_payment: 'รอชำระเงิน', confirmed: 'ยืนยันแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
@@ -17,20 +16,17 @@ export default function BookingHistory() {
 
   useEffect(() => {
     const loadBookings = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
+      const sessionResponse = await fetch('/api/auth/me');
+      const { user } = await sessionResponse.json();
+      if (!user) {
         router.replace('/login');
         return;
       }
 
-      const { data, error: queryError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .order('created_at', { ascending: false });
-
-      if (queryError) setError(queryError.message);
-      setBookings(data || []);
+      const response = await fetch('/api/bookings');
+      const result = await response.json();
+      if (!response.ok) setError(result.error || 'โหลดรายการจองไม่สำเร็จ');
+      setBookings(result.bookings || []);
       setIsLoading(false);
     };
 
@@ -40,9 +36,10 @@ export default function BookingHistory() {
   const cancelBooking = async (bookingId) => {
     if (!window.confirm('ต้องการยกเลิกรายการจองนี้หรือไม่?')) return;
     setCancellingId(bookingId);
-    const { error: cancelError } = await supabase.from('bookings').delete().eq('id', bookingId).eq('status', 'pending');
-    if (cancelError) {
-      setError(cancelError.message);
+    const response = await fetch(`/api/bookings/${bookingId}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) {
+      setError(result.error || 'ยกเลิกรายการจองไม่สำเร็จ');
     } else {
       setBookings((currentBookings) => currentBookings.filter((booking) => booking.id !== bookingId));
     }
