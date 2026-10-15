@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser, hashPassword } from '@/lib/auth';
 import { getDatabase } from '@/lib/mysql';
 
 async function requireAdmin() {
@@ -27,6 +27,51 @@ export async function GET() {
   } catch (error) {
     console.error('Admin users lookup failed:', error);
     return NextResponse.json({ error: 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ' }, { status: 500 });
+  }
+}
+
+export async function POST(request) {
+  try {
+    const { response } = await requireAdmin();
+    if (response) return response;
+
+    const body = await request.json();
+    const email = String(body.email || '').trim().toLowerCase();
+    const username = String(body.username || '').trim();
+    const fullName = String(body.fullName || '').trim();
+    const phone = String(body.phone || '').trim();
+    const password = String(body.password || '');
+
+    if (!fullName || !phone || !username) {
+      return NextResponse.json({ error: 'กรุณากรอกชื่อ-นามสกุล เบอร์โทรศัพท์ และชื่อผู้ใช้งานให้ครบถ้วน' }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 6) {
+      return NextResponse.json({ error: 'กรุณาตรวจสอบอีเมลและรหัสผ่าน (อย่างน้อย 6 ตัวอักษร)' }, { status: 400 });
+    }
+
+    const database = getDatabase();
+    const [result] = await database.execute(
+      'INSERT INTO users (email, password_hash, username, full_name, phone) VALUES (?, ?, ?, ?, ?)',
+      [email, hashPassword(password), username, fullName, phone],
+    );
+
+    return NextResponse.json({
+      user: {
+        id: Number(result.insertId),
+        email,
+        username,
+        full_name: fullName,
+        phone,
+        role: 'user',
+        created_at: new Date(),
+      },
+    }, { status: 201 });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return NextResponse.json({ error: 'อีเมลนี้มีบัญชีอยู่แล้ว' }, { status: 409 });
+    }
+    console.error('Admin user creation failed:', error);
+    return NextResponse.json({ error: 'เพิ่มสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }, { status: 500 });
   }
 }
 

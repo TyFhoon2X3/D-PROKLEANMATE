@@ -14,6 +14,9 @@ export default function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingRoleUserId, setPendingRoleUserId] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', password: '', username: '', fullName: '', phone: '' });
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -80,6 +83,33 @@ export default function AdminUsers() {
     setPendingRoleUserId(null);
   };
 
+  const createUser = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    setIsCreating(true);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setMessage(result.error || 'เพิ่มสมาชิกไม่สำเร็จ');
+        return;
+      }
+
+      setUsers((current) => [{ ...result.user, booking_count: 0 }, ...current]);
+      setNewUser({ email: '', password: '', username: '', fullName: '', phone: '' });
+      setShowCreateForm(false);
+      setMessage('เพิ่มสมาชิกสำเร็จ');
+    } catch {
+      setMessage('เพิ่มสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const signOut = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
@@ -91,7 +121,18 @@ export default function AdminUsers() {
     <main className="admin-page">
       <header className="admin-header"><div><span className="admin-kicker">D-PROKLEANMATE</span><h1>จัดการผู้ใช้</h1></div><div className="admin-header-actions"><Link href="/admin">กลับระบบผู้ดูแล</Link><button type="button" onClick={signOut}>ออกจากระบบ</button></div></header>
       <section className="admin-content">
-        <div className="admin-welcome"><div><h2>บัญชีผู้ใช้</h2><p>ดูข้อมูลติดต่อ ประวัติการจอง และกำหนดสิทธิ์บัญชี</p></div><span className="admin-date">ทั้งหมด {users.length} บัญชี</span></div>
+        <div className="admin-welcome"><div><h2>บัญชีผู้ใช้</h2><p>ดูข้อมูลติดต่อ ประวัติการจอง และกำหนดสิทธิ์บัญชี</p></div><div className="admin-user-actions"><span className="admin-date">ทั้งหมด {users.length} บัญชี</span><button type="button" onClick={() => { setShowCreateForm((current) => !current); setMessage(''); }}>เพิ่มสมาชิก</button></div></div>
+        {showCreateForm && <form className="admin-user-create-form" onSubmit={createUser}>
+          <h3>เพิ่มสมาชิกใหม่</h3>
+          <div className="admin-user-create-fields">
+            <label>ชื่อ-นามสกุล<input name="fullName" autoComplete="name" required value={newUser.fullName} onChange={(event) => setNewUser((current) => ({ ...current, fullName: event.target.value }))} /></label>
+            <label>ชื่อผู้ใช้งาน<input name="username" autoComplete="username" required value={newUser.username} onChange={(event) => setNewUser((current) => ({ ...current, username: event.target.value }))} /></label>
+            <label>อีเมล<input name="email" type="email" autoComplete="email" required value={newUser.email} onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))} /></label>
+            <label>เบอร์โทรศัพท์<input name="phone" type="tel" autoComplete="tel" required value={newUser.phone} onChange={(event) => setNewUser((current) => ({ ...current, phone: event.target.value }))} /></label>
+            <label>รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)<input name="password" type="password" autoComplete="new-password" minLength={6} required value={newUser.password} onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))} /></label>
+          </div>
+          <div className="admin-user-create-actions"><button type="button" className="admin-user-cancel-button" onClick={() => setShowCreateForm(false)}>ยกเลิก</button><button type="submit" disabled={isCreating}>{isCreating ? 'กำลังเพิ่ม...' : 'บันทึกสมาชิก'}</button></div>
+        </form>}
         <div className="admin-users-toolbar"><input aria-label="ค้นหาผู้ใช้" placeholder="ค้นหาชื่อ อีเมล หรือเบอร์โทรศัพท์" value={search} onChange={(event) => setSearch(event.target.value)} /><span>{filteredUsers.length} รายการ</span></div>
         {message && <p className="booking-error" role="alert">{message}</p>}
         <div className="admin-table-wrap">
