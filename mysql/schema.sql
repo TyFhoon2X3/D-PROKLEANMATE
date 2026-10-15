@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS services (
   starting_price VARCHAR(255) NOT NULL,
   price VARCHAR(255) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  image_data MEDIUMBLOB,
+  image_mime_type VARCHAR(50),
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

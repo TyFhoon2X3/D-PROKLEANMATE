@@ -25,12 +25,36 @@ export async function POST(request) {
     if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
 
     const body = await request.json();
-    const customerName = String(body.customer_name || '').trim();
-    const customerPhone = String(body.customer_phone || '').trim();
-    const serviceAddress = String(body.service_address || '').trim();
+    const customerName = String(user.full_name || user.username || '').trim();
+    const customerPhone = String(user.phone || '').trim();
+    const customerEmail = String(user.email || '').trim();
+    const address = body.service_address && typeof body.service_address === 'object' ? body.service_address : {};
+    const houseNumber = String(address.houseNumber || '').trim();
+    const moo = String(address.moo || '').trim();
+    const building = String(address.building || '').trim();
+    const soi = String(address.soi || '').trim();
+    const road = String(address.road || '').trim();
+    const subdistrict = String(address.subdistrict || '').trim();
+    const district = String(address.district || '').trim();
+    const province = String(address.province || '').trim();
+    const postalCode = String(address.postalCode || '').trim();
+    const serviceAddress = [
+      `บ้านเลขที่ ${houseNumber}`,
+      moo && `หมู่ ${moo}`,
+      building && `อาคาร/หมู่บ้าน ${building}`,
+      soi && `ซอย ${soi}`,
+      road && `ถนน ${road}`,
+      `ตำบล/แขวง ${subdistrict}`,
+      `อำเภอ/เขต ${district}`,
+      `จังหวัด ${province}`,
+      `รหัสไปรษณีย์ ${postalCode}`,
+    ].filter(Boolean).join(' ');
     const siteVisitDate = String(body.site_visit_date || '');
     const paymentMethod = body.payment_method;
-    if (!customerName || !customerPhone || !serviceAddress || !/^\d{4}-\d{2}-\d{2}$/.test(siteVisitDate)) {
+    if (!customerName || !customerPhone || !customerEmail) {
+      return NextResponse.json({ error: 'กรุณาเพิ่มชื่อและเบอร์โทรศัพท์ในโปรไฟล์ก่อนจอง' }, { status: 400 });
+    }
+    if (!houseNumber || !subdistrict || !district || !province || !/^\d{5}$/.test(postalCode) || !/^\d{4}-\d{2}-\d{2}$/.test(siteVisitDate)) {
       return NextResponse.json({ error: 'กรุณากรอกข้อมูลการจองให้ครบถ้วน' }, { status: 400 });
     }
     if (!['qr', 'cash'].includes(paymentMethod)) {
@@ -52,7 +76,7 @@ export async function POST(request) {
       `INSERT INTO bookings
         (order_number, user_id, service_id, service_name, service_price, site_visit_date, customer_name, customer_phone, customer_email, service_address, payment_method)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [orderNumber, user.id, service.id, service.name, service.starting_price || service.price, siteVisitDate, customerName, customerPhone, String(body.customer_email || user.email).trim() || null, serviceAddress, paymentMethod],
+      [orderNumber, user.id, service.id, service.name, service.starting_price || service.price, siteVisitDate, customerName, customerPhone, customerEmail, serviceAddress, paymentMethod],
     );
     return NextResponse.json({ id: result.insertId, order_number: orderNumber }, { status: 201 });
   } catch (error) {

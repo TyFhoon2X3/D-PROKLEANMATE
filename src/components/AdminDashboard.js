@@ -1,10 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const statusLabels = { pending: 'รอการยืนยัน', quote: 'ประเมินราคา', awaiting_payment: 'รอชำระเงิน', confirmed: 'ยืนยันแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
+const maxServiceImageBytes = 1024 * 1024;
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ'));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -19,6 +30,7 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState('');
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
+  const [newServiceImage, setNewServiceImage] = useState(null);
 
   useEffect(() => {
     const loadAdminData = async () => {
@@ -91,13 +103,14 @@ export default function AdminDashboard() {
     const response = await fetch('/api/admin/services', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newServiceName.trim(), price }),
+      body: JSON.stringify({ name: newServiceName.trim(), price, image_data: newServiceImage }),
     });
     const result = await response.json();
     if (!response.ok) return setMessage(result.error || 'เพิ่มบริการไม่สำเร็จ');
     setServices((current) => [...current, result.service]);
     setNewServiceName('');
     setNewServicePrice('');
+    setNewServiceImage(null);
   };
 
   const updateService = async (id, changes) => {
@@ -108,7 +121,26 @@ export default function AdminDashboard() {
     });
     const result = await response.json();
     if (!response.ok) return setMessage(result.error || 'แก้ไขบริการไม่สำเร็จ');
-    setServices((current) => current.map((service) => service.id === id ? { ...service, ...changes } : service));
+    setServices((current) => current.map((service) => service.id === id ? { ...service, ...result.service } : service));
+  };
+
+  const handleServiceImageChange = async (event, serviceId = null) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > maxServiceImageBytes) {
+      setMessage('รูปต้องเป็น JPEG, PNG หรือ WebP และมีขนาดไม่เกิน 1 MB');
+      return;
+    }
+
+    try {
+      const imageData = await readImageFile(file);
+      setMessage('');
+      if (serviceId === null) setNewServiceImage(imageData);
+      else await updateService(serviceId, { image_data: imageData });
+    } catch {
+      setMessage('อ่านไฟล์รูปไม่สำเร็จ');
+    }
   };
 
   const signOut = async () => {
@@ -128,7 +160,7 @@ export default function AdminDashboard() {
         <div className="admin-stat-grid"><StatCard label="รายการทั้งหมด" value={bookings.length} /><StatCard label="ประเมินราคา" value={counts.quote || 0} accent="quote" /><StatCard label="รอชำระเงิน" value={counts.awaiting_payment || 0} accent="payment" /><StatCard label="ยืนยันแล้ว" value={counts.confirmed || 0} accent="confirmed" /></div>
         <div className="admin-toolbar"><input aria-label="ค้นหารายการจอง" placeholder="ค้นหาเลขออเดอร์ ชื่อลูกค้า หรือบริการ" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="กรองสถานะ" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option><option value="pending">รอการยืนยัน</option><option value="confirmed">ยืนยันแล้ว</option><option value="completed">เสร็จสิ้น</option><option value="cancelled">ยกเลิก</option></select></div>
         {message && <p className="booking-error">{message}</p>}
-        <section className="admin-services"><h2>จัดการบริการ</h2><form className="admin-service-form" onSubmit={addService}><input placeholder="ชื่อบริการใหม่" value={newServiceName} onChange={(event) => setNewServiceName(event.target.value)} /><input placeholder="ราคาเริ่มต้น" value={newServicePrice} onChange={(event) => setNewServicePrice(event.target.value)} /><button type="submit">เพิ่มบริการ</button></form>{services.map((service) => <div className="admin-service-row" key={service.id}><input defaultValue={service.name} onBlur={(event) => updateService(service.id, { name: event.target.value.trim() })} /><input defaultValue={service.starting_price || service.price || ''} onBlur={(event) => { const price = event.target.value.trim(); updateService(service.id, { price, starting_price: price }); }} /><label><input type="checkbox" checked={service.is_active} onChange={(event) => updateService(service.id, { is_active: event.target.checked })} /> เปิดใช้งาน</label></div>)}</section>
+        <section className="admin-services"><h2>จัดการบริการ</h2><form className="admin-service-form" onSubmit={addService}><input placeholder="ชื่อบริการใหม่" value={newServiceName} onChange={(event) => setNewServiceName(event.target.value)} /><input placeholder="ราคาเริ่มต้น" value={newServicePrice} onChange={(event) => setNewServicePrice(event.target.value)} /><label className="admin-service-upload">{newServiceImage ? 'เลือกรูปแล้ว' : 'เลือกรูป (ไม่เกิน 1 MB)'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleServiceImageChange(event)} /></label><button type="submit">เพิ่มบริการ</button></form>{services.map((service) => <div className="admin-service-row" key={service.id}><input aria-label={`ชื่อบริการ ${service.name}`} defaultValue={service.name} onBlur={(event) => updateService(service.id, { name: event.target.value.trim() })} /><input aria-label={`ราคา ${service.name}`} defaultValue={service.starting_price || service.price || ''} onBlur={(event) => { const price = event.target.value.trim(); updateService(service.id, { price, starting_price: price }); }} /><div className="admin-service-image-control">{service.image_url && <Image className="admin-service-image-preview" src={service.image_url} width={48} height={38} unoptimized alt={`รูป${service.name}`} />}<label className="admin-service-upload">{service.image_url ? 'เปลี่ยนรูป' : 'เพิ่มรูป'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleServiceImageChange(event, service.id)} /></label>{service.image_url && <button type="button" className="admin-service-remove-image" onClick={() => updateService(service.id, { image_data: null })}>ลบรูป</button>}</div><label><input type="checkbox" checked={Boolean(service.is_active)} onChange={(event) => updateService(service.id, { is_active: event.target.checked })} /> เปิดใช้งาน</label></div>)}</section>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>ออเดอร์</th><th>ลูกค้า</th><th>บริการ</th><th>วันเข้าประเมิน</th><th>วันทำความสะอาด</th><th>ราคา</th><th>ชำระเงิน</th><th>สลิป</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filteredBookings.map((booking) => <tr key={booking.id}><td><Link href={`/bookings/${booking.id}`} className="admin-order-link"><strong>{booking.order_number}</strong><small>{new Date(booking.created_at).toLocaleDateString('th-TH')}</small></Link></td><td><strong>{booking.customer_name}</strong><small>{booking.customer_phone}</small></td><td>{booking.service_name}</td><td>{booking.site_visit_date || '-'}</td><td><input className="admin-date-input" type="date" defaultValue={booking.service_date || ''} onBlur={(event) => updateField(booking.id, 'service_date', event.target.value)} /></td><td><input className="admin-price-input" type="number" min="0" step="0.01" defaultValue={booking.admin_price ?? ''} onBlur={(event) => updateField(booking.id, 'admin_price', event.target.value)} /></td><td>{booking.payment_method === 'cash' ? 'เงินสด' : 'QR Code'}</td><td>{booking.payment_slip_url ? <a href={booking.payment_slip_url} target="_blank" rel="noreferrer">ดูสลิป</a> : 'ยังไม่มี'}</td><td><span className={`status-badge status-${booking.status}`}>{statusLabels[booking.status] || booking.status}</span></td><td><select className="status-select" value={booking.status} onChange={(event) => updateStatus(booking.id, event.target.value)} aria-label={`เปลี่ยนสถานะ ${booking.order_number}`}>{Object.entries(statusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></td></tr>)}</tbody></table>{filteredBookings.length === 0 && <div className="admin-empty">ไม่พบรายการจอง</div>}</div>
       </section>
     </main>

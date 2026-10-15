@@ -59,18 +59,90 @@ export async function DELETE(_request, { params }) {
   }
 }
 
+async function updateCustomerBooking(request, user, id, database) {
+  const [bookings] = await database.execute(
+    'SELECT id, order_number, status FROM bookings WHERE id = ? AND user_id = ?',
+    [id, user.id],
+  );
+  if (!bookings.length)
+    return NextResponse.json({ error: 'ไม่พบรายการจองนี้' }, { status: 404 });
+  if (bookings[0].status !== 'pending')
+    return NextResponse.json(
+      { error: 'แก้ไขได้เฉพาะรายการที่รอการยืนยัน' },
+      { status: 409 },
+    );
+
+  const body = await request.json();
+  const serviceName = String(body.service_name || '').trim();
+  const siteVisitDate = String(body.site_visit_date || '');
+  const paymentMethod = body.payment_method;
+  const address = body.service_address && typeof body.service_address === 'object' ? body.service_address : {};
+  const houseNumber = String(address.houseNumber || '').trim();
+  const moo = String(address.moo || '').trim();
+  const building = String(address.building || '').trim();
+  const soi = String(address.soi || '').trim();
+  const road = String(address.road || '').trim();
+  const subdistrict = String(address.subdistrict || '').trim();
+  const district = String(address.district || '').trim();
+  const province = String(address.province || '').trim();
+  const postalCode = String(address.postalCode || '').trim();
+  const serviceAddress = [
+    `บ้านเลขที่ ${houseNumber}`,
+    moo && `หมู่ ${moo}`,
+    building && `อาคาร/หมู่บ้าน ${building}`,
+    soi && `ซอย ${soi}`,
+    road && `ถนน ${road}`,
+    `ตำบล/แขวง ${subdistrict}`,
+    `อำเภอ/เขต ${district}`,
+    `จังหวัด ${province}`,
+    `รหัสไปรษณีย์ ${postalCode}`,
+  ].filter(Boolean).join(' ');
+
+  if (!houseNumber || !subdistrict || !district || !province || !/^\d{5}$/.test(postalCode) || !/^\d{4}-\d{2}-\d{2}$/.test(siteVisitDate))
+    return NextResponse.json({ error: 'กรุณากรอกข้อมูลการจองให้ครบถ้วน' }, { status: 400 });
+  if (!['qr', 'cash'].includes(paymentMethod))
+    return NextResponse.json({ error: 'วิธีชำระเงินไม่ถูกต้อง' }, { status: 400 });
+
+  const [[{ today }]] = await database.query('SELECT CURRENT_DATE() AS today');
+  if (siteVisitDate < today)
+    return NextResponse.json({ error: 'ไม่สามารถเลือกวันที่ย้อนหลังได้' }, { status: 400 });
+
+  const [services] = await database.execute(
+    'SELECT id, name, starting_price, price FROM services WHERE name = ? AND is_active = TRUE',
+    [serviceName],
+  );
+  if (!services.length)
+    return NextResponse.json({ error: 'ไม่พบบริการที่เลือก' }, { status: 400 });
+
+  const service = services[0];
+  const [result] = await database.execute(
+    `UPDATE bookings
+    SET service_id = ?, service_name = ?, service_price = ?, site_visit_date = ?,
+      customer_name = ?, customer_phone = ?, customer_email = ?, service_address = ?, payment_method = ?
+    WHERE id = ? AND user_id = ? AND status = 'pending'`,
+    [service.id, service.name, service.starting_price || service.price, siteVisitDate, user.full_name || user.username || user.email, user.phone, user.email, serviceAddress, paymentMethod, id, user.id],
+  );
+  if (!result.affectedRows)
+    return NextResponse.json(
+      { error: 'รายการจองเปลี่ยนสถานะแล้ว กรุณาโหลดหน้าใหม่' },
+      { status: 409 },
+    );
+
+  return NextResponse.json({ id: Number(id), order_number: bookings[0].order_number });
+}
+
 export async function PATCH(request, { params }) {
   try {
     const user = await getSessionUser();
     if (!user)
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-    if (user.role !== "admin")
-      return NextResponse.json(
-        { error: "ไม่มีสิทธิ์ดำเนินการ" },
-        { status: 403 },
-      );
-
     const { id } = await params;
+    if (!/^\d+$/.test(id))
+      return NextResponse.json({ error: "ไม่พบรายการจองนี้" }, { status: 404 });
+    const database = getDatabase();
+    if (user.role !== "admin")
+      return updateCustomerBooking(request, user, id, database);
+
     const body = await request.json();
     const allowedFields = [
       "status",
@@ -124,7 +196,6 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const database = getDatabase();
     const nextServiceDate = body.service_date;
     if (nextServiceDate) {
       const [[{ today }]] = await database.query(
@@ -154,7 +225,7 @@ export async function PATCH(request, { params }) {
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY")
       return NextResponse.json(
-        { error: "วันที่นี้มีรายการจองแล้ว" },
+        { error: "วันที่เข้าประเมินสถานที่นี้มีผู้จองแล้ว กรุณาเลือกวันอื่น" },
         { status: 409 },
       );
     if (error.code === "ER_CHECK_CONSTRAINT_VIOLATED" || error.errno === 3819) {

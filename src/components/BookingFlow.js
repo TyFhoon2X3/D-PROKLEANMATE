@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 const defaultServices = [
@@ -12,6 +13,30 @@ const defaultServices = [
   { name: 'ขอโปไซน์', price: 'เริ่มต้น 1,500 บาท' },
   { name: 'หลังน้ำท่วม', price: 'เริ่มต้น 45 บาท/ตร.ม.' },
 ];
+
+const addressFields = [
+  { name: 'houseNumber', label: 'เลขที่บ้าน', placeholder: 'เช่น 99/1', required: true },
+  { name: 'moo', label: 'หมู่ที่', placeholder: 'ถ้ามี' },
+  { name: 'building', label: 'อาคาร/หมู่บ้าน', placeholder: 'ถ้ามี' },
+  { name: 'soi', label: 'ซอย', placeholder: 'ถ้ามี' },
+  { name: 'road', label: 'ถนน', placeholder: 'ถ้ามี' },
+  { name: 'subdistrict', label: 'ตำบล/แขวง', placeholder: 'กรอกตำบลหรือแขวง', required: true },
+  { name: 'district', label: 'อำเภอ/เขต', placeholder: 'กรอกอำเภอหรือเขต', required: true },
+  { name: 'province', label: 'จังหวัด', placeholder: 'กรอกจังหวัด', required: true },
+  { name: 'postalCode', label: 'รหัสไปรษณีย์', placeholder: '5 หลัก', required: true },
+];
+
+const formatServiceAddress = (address) => [
+  `บ้านเลขที่ ${address.houseNumber}`,
+  address.moo && `หมู่ ${address.moo}`,
+  address.building && `อาคาร/หมู่บ้าน ${address.building}`,
+  address.soi && `ซอย ${address.soi}`,
+  address.road && `ถนน ${address.road}`,
+  `ตำบล/แขวง ${address.subdistrict}`,
+  `อำเภอ/เขต ${address.district}`,
+  `จังหวัด ${address.province}`,
+  `รหัสไปรษณีย์ ${address.postalCode}`,
+].filter(Boolean).join(' ');
 
 const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
@@ -27,6 +52,9 @@ export default function BookingFlow() {
   const [services, setServices] = useState(defaultServices);
   const [selectedService, setSelectedService] = useState(0);
   const [selectedDate, setSelectedDate] = useState(today.day);
+  const [bookedVisitDates, setBookedVisitDates] = useState([]);
+  const [isLoadingVisitDates, setIsLoadingVisitDates] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const currentDate = new Date();
     return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -35,7 +63,9 @@ export default function BookingFlow() {
   const [isSaving, setIsSaving] = useState(false);
   const [bookingMessage, setBookingMessage] = useState('');
   const [orderNumber, setOrderNumber] = useState('DP0000');
-  const [customer, setCustomer] = useState({ name: '', phone: '', email: '', address: '' });
+  const [bookingId, setBookingId] = useState(null);
+  const [account, setAccount] = useState({ name: '', phone: '', email: '' });
+  const [customer, setCustomer] = useState({ houseNumber: '', moo: '', building: '', soi: '', road: '', subdistrict: '', district: '', province: '', postalCode: '' });
   const [paymentMethod, setPaymentMethod] = useState('qr');
 
   useEffect(() => {
@@ -46,6 +76,7 @@ export default function BookingFlow() {
         router.replace('/login');
         return;
       }
+      setAccount({ name: user.full_name || user.username || '', phone: user.phone || '', email: user.email || '' });
       setIsCheckingSession(false);
     };
 
@@ -56,26 +87,65 @@ export default function BookingFlow() {
     const loadServices = async () => {
       const response = await fetch('/api/services');
       const { services: data } = await response.json();
-      if (data?.length) setServices(data.map((service) => ({ id: service.id, name: service.name, price: service.starting_price || service.price })));
+      if (data?.length) setServices(data.map((service) => ({ id: service.id, name: service.name, price: service.starting_price || service.price, image_url: service.image_url })));
     };
     loadServices();
   }, []);
 
-  const nextStep = () => setStep((currentStep) => Math.min(currentStep + 1, 4));
+  useEffect(() => {
+    if (step !== 2) return undefined;
+
+    const controller = new AbortController();
+    const year = calendarMonth.getFullYear();
+    const month = String(calendarMonth.getMonth() + 1).padStart(2, '0');
+    const exclude = bookingId ? `&exclude=${bookingId}` : '';
+
+    const loadAvailability = async () => {
+      setIsLoadingVisitDates(true);
+      setAvailabilityError('');
+      try {
+        const response = await fetch(`/api/bookings/availability?month=${year}-${month}${exclude}`, { signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'ตรวจสอบวันว่างไม่สำเร็จ');
+        setBookedVisitDates(result.dates || []);
+      } catch (error) {
+        if (error.name !== 'AbortError') setAvailabilityError(error.message || 'ตรวจสอบวันว่างไม่สำเร็จ');
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingVisitDates(false);
+      }
+    };
+
+    loadAvailability();
+    return () => controller.abort();
+  }, [step, calendarMonth, bookingId]);
+
+  const nextStep = () => {
+    if (step === 1) {
+      setAvailabilityError('');
+      setIsLoadingVisitDates(true);
+    }
+    setStep((currentStep) => Math.min(currentStep + 1, 4));
+  };
   const previousStep = () => setStep((currentStep) => Math.max(currentStep - 1, 1));
   const goToStep = (nextStep) => {
-    if (nextStep <= step) setStep(nextStep);
+    if (nextStep <= step) {
+      if (nextStep === 2) {
+        setAvailabilityError('');
+        setIsLoadingVisitDates(true);
+      }
+      setStep(nextStep);
+    }
   };
 
   const changeMonth = (offset) => {
-    setCalendarMonth((currentMonth) => {
-      const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
-      const isBeforeCurrentMonth = nextMonth.getFullYear() < today.year
-        || (nextMonth.getFullYear() === today.year && nextMonth.getMonth() < today.month);
-      if (isBeforeCurrentMonth) return currentMonth;
-      setSelectedDate(nextMonth.getFullYear() === today.year && nextMonth.getMonth() === today.month ? today.day : 1);
-      return nextMonth;
-    });
+    const nextMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + offset, 1);
+    const isBeforeCurrentMonth = nextMonth.getFullYear() < today.year
+      || (nextMonth.getFullYear() === today.year && nextMonth.getMonth() < today.month);
+    if (isBeforeCurrentMonth) return;
+    setAvailabilityError('');
+    setIsLoadingVisitDates(true);
+    setSelectedDate(nextMonth.getFullYear() === today.year && nextMonth.getMonth() === today.month ? today.day : 1);
+    setCalendarMonth(nextMonth);
   };
 
   const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
@@ -85,6 +155,9 @@ export default function BookingFlow() {
   const isDatePast = (day) => calendarMonth.getFullYear() < today.year
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() < today.month)
     || (calendarMonth.getFullYear() === today.year && calendarMonth.getMonth() === today.month && day < today.day);
+  const isVisitDateBooked = (day) => bookedVisitDates.includes(
+    `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  );
   const updateCustomer = (field, value) => {
     setCustomer((currentCustomer) => ({ ...currentCustomer, [field]: value }));
   };
@@ -92,13 +165,17 @@ export default function BookingFlow() {
   const saveBooking = async (event) => {
     event.preventDefault();
     setBookingMessage('');
-    if (!customer.name || !customer.phone || !customer.address || !paymentMethod) {
-      setBookingMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');
+    if (!customer.houseNumber || !customer.subdistrict || !customer.district || !customer.province || !/^\d{5}$/.test(customer.postalCode) || !paymentMethod) {
+      setBookingMessage('กรุณากรอกที่อยู่ที่มีเครื่องหมาย * ให้ครบถ้วน และตรวจสอบรหัสไปรษณีย์ 5 หลัก');
       return;
     }
 
     if (isDatePast(selectedDate)) {
       setBookingMessage('วันที่เลือกผ่านไปแล้ว กรุณาเลือกวันใหม่');
+      return;
+    }
+    if (isVisitDateBooked(selectedDate)) {
+      setBookingMessage('วันที่เข้าประเมินสถานที่นี้มีผู้จองแล้ว กรุณาเลือกวันอื่น');
       return;
     }
 
@@ -116,17 +193,14 @@ export default function BookingFlow() {
     }
 
     const selectedServiceData = services[selectedService];
-    const response = await fetch('/api/bookings', {
-      method: 'POST',
+    const response = await fetch(bookingId ? `/api/bookings/${bookingId}` : '/api/bookings', {
+      method: bookingId ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-      service_name: selectedServiceData.name,
-      site_visit_date: selectedIsoDate,
-      customer_name: customer.name,
-      customer_phone: customer.phone,
-      customer_email: customer.email || user.email,
-      service_address: customer.address,
-      payment_method: paymentMethod,
+        service_name: selectedServiceData.name,
+        site_visit_date: selectedIsoDate,
+        service_address: customer,
+        payment_method: paymentMethod,
       }),
     });
     const result = await response.json();
@@ -138,6 +212,7 @@ export default function BookingFlow() {
     }
 
     setOrderNumber(result.order_number);
+  if (result.id) setBookingId(result.id);
     setStep(4);
   };
 
@@ -163,7 +238,7 @@ export default function BookingFlow() {
           <div className="service-list">
             {services.map((service, index) => (
               <button type="button" className={`service-option ${selectedService === index ? 'selected' : ''}`} key={service.id || service.name} onClick={() => setSelectedService(index)}>
-                <span className={`service-image service-image-${index}`} aria-hidden="true" />
+                {service.image_url ? <Image className="service-image service-image-uploaded" src={service.image_url} width={79} height={43} unoptimized alt="" /> : <span className={`service-image service-image-${index}`} aria-hidden="true" />}
                 <span className="service-copy"><strong>{service.name}</strong><small>{service.price}</small></span>
                 <span className="service-radio" aria-hidden="true" />
               </button>
@@ -183,11 +258,16 @@ export default function BookingFlow() {
               {[...Array(firstDayOfMonth)].map((_, index) => <span key={`empty-${index}`} />)}
               {[...Array(daysInMonth)].map((_, index) => {
                 const day = index + 1;
-                return <button type="button" key={day} className={selectedDate === day ? 'selected' : ''} disabled={isDatePast(day)} onClick={() => setSelectedDate(day)}>{day}</button>;
+                const isBooked = isVisitDateBooked(day);
+                const className = [selectedDate === day && 'selected', isBooked && 'booked'].filter(Boolean).join(' ');
+                return <button type="button" key={day} className={className} aria-label={isBooked ? `${day} ${thaiMonths[calendarMonth.getMonth()]} ถูกจองแล้ว` : `${day} ${thaiMonths[calendarMonth.getMonth()]}`} title={isBooked ? 'มีผู้จองแล้ว' : undefined} disabled={isDatePast(day) || isBooked || isLoadingVisitDates || Boolean(availabilityError)} onClick={() => setSelectedDate(day)}>{day}</button>;
               })}
             </div>
           </div>
-          <button type="button" className="next-button" disabled={isDatePast(selectedDate)} onClick={nextStep}>ถัดไป</button>
+          {isLoadingVisitDates && <p className="booking-slot-note">กำลังตรวจสอบวันว่าง...</p>}
+          {!isLoadingVisitDates && !availabilityError && <p className="booking-slot-note">วันที่ขีดฆ่ามีผู้จองแล้ว กรุณาเลือกวันอื่น</p>}
+          {availabilityError && <p className="booking-error" role="alert">{availabilityError}</p>}
+          <button type="button" className="next-button" disabled={isDatePast(selectedDate) || isVisitDateBooked(selectedDate) || isLoadingVisitDates || Boolean(availabilityError)} onClick={nextStep}>ถัดไป</button>
         </>}
 
         {step === 3 && <>
@@ -195,14 +275,11 @@ export default function BookingFlow() {
           <StepIndicator activeStep={step} onStepClick={goToStep} />
           <h2 className="booking-label">ข้อมูลผู้จอง</h2>
           <form className="customer-form" onSubmit={saveBooking}>
-            <label htmlFor="customer-name">ชื่อ-นามสกุล <b>*</b></label>
-            <input id="customer-name" placeholder="กรอกชื่อ-นามสกุล" value={customer.name} onChange={(event) => updateCustomer('name', event.target.value)} />
-            <label htmlFor="customer-phone">เบอร์โทรศัพท์ <b>*</b></label>
-            <input id="customer-phone" placeholder="กรอกเบอร์โทรศัพท์" value={customer.phone} onChange={(event) => updateCustomer('phone', event.target.value)} />
-            <label htmlFor="customer-email">อีเมล</label>
-            <input id="customer-email" type="email" placeholder="กรอกอีเมล (ถ้ามี)" value={customer.email} onChange={(event) => updateCustomer('email', event.target.value)} />
-            <label htmlFor="customer-address">ที่อยู่สำหรับให้บริการ <b>*</b></label>
-            <textarea id="customer-address" placeholder="กรอกที่อยู่" value={customer.address} onChange={(event) => updateCustomer('address', event.target.value)} />
+            <div className="booking-account-info"><strong>ข้อมูลจากบัญชีผู้ใช้</strong><span>{account.name || 'ยังไม่มีชื่อในโปรไฟล์'}</span><span>{account.phone || 'ยังไม่มีเบอร์โทรศัพท์ในโปรไฟล์'}</span><span>{account.email}</span></div>
+            <h3 className="address-form-heading">ที่อยู่สำหรับให้บริการ</h3>
+            <div className="address-fields">
+              {addressFields.map((field) => <label key={field.name} htmlFor={`service-address-${field.name}`}><span>{field.label}{field.required && <> <b>*</b></>}</span><input id={`service-address-${field.name}`} name={field.name} placeholder={field.placeholder} required={field.required} inputMode={field.name === 'postalCode' ? 'numeric' : undefined} maxLength={field.name === 'postalCode' ? 5 : undefined} value={customer[field.name]} onChange={(event) => updateCustomer(field.name, event.target.value)} /></label>)}
+            </div>
             <label htmlFor="payment-method">วิธีชำระเงิน <b>*</b></label>
             <select id="payment-method" className="payment-method-select" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
               <option value="qr">ชำระผ่าน QR Code</option>
@@ -218,16 +295,17 @@ export default function BookingFlow() {
           <StepIndicator activeStep={step} onStepClick={goToStep} />
           <div className="booking-summary-header"><div>หมายเลขออเดอร์<br /><strong>{orderNumber}</strong></div><span>รอการยืนยัน</span></div>
           <div className="booking-summary-card">
-            <div className={`summary-service-image service-image-${selectedService}`} />
+            {services[selectedService].image_url ? <Image className="summary-service-image summary-service-image-uploaded" src={services[selectedService].image_url} width={94} height={70} unoptimized alt="" /> : <div className={`summary-service-image service-image-${selectedService}`} />}
             <div><strong>{services[selectedService].name}</strong><small>{services[selectedService].price}</small></div>
           </div>
           <div className="booking-details-grid">
             <div><small>วันที่เข้าประเมินสถานที่</small><strong>{selectedDate} {thaiMonths[calendarMonth.getMonth()]} {calendarMonth.getFullYear() + 543}</strong></div>
             <div><small>วันที่เข้าทำความสะอาด</small><strong>รอแอดมินกำหนด</strong></div>
             <div><small>วิธีชำระเงิน</small><strong>{paymentMethod === 'qr' ? 'QR Code' : 'เงินสด'}</strong></div>
-            <div><small>ชื่อผู้จอง</small><strong>{customer.name || '-'}</strong></div>
-            <div><small>เบอร์โทรศัพท์</small><strong>{customer.phone || '-'}</strong></div>
-            <div className="full-detail"><small>ที่อยู่ให้บริการ</small><strong>{customer.address || '-'}</strong></div>
+            <div><small>ชื่อผู้จอง</small><strong>{account.name || '-'}</strong></div>
+            <div><small>เบอร์โทรศัพท์</small><strong>{account.phone || '-'}</strong></div>
+            <div className="full-detail"><small>อีเมล</small><strong>{account.email || '-'}</strong></div>
+            <div className="full-detail"><small>ที่อยู่ให้บริการ</small><strong>{formatServiceAddress(customer)}</strong></div>
           </div>
           <div className="summary-actions"><button type="button" onClick={previousStep}>ยกเลิกการจอง</button><button type="button" onClick={previousStep}>แก้ไขการจอง</button></div>
         </>}

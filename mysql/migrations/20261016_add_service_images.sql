@@ -1,0 +1,3 @@
+ALTER TABLE services
+  ADD COLUMN image_data MEDIUMBLOB NULL,
+  ADD COLUMN image_mime_type VARCHAR(50) NULL;

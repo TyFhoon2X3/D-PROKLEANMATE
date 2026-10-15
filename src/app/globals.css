@@ -71,13 +71,18 @@ body {
 .admin-empty { padding: 50px; color: #718096; text-align: center; }
 .admin-services { display: grid; gap: 14px; margin-bottom: 18px; padding: 20px; background: #fff; border: 1px solid #e1e7ec; border-radius: 10px; box-shadow: 0 4px 16px rgba(6,43,85,.04); }
 .admin-services h2 { margin: 0; color: #062b55; font-size: 18px; }
-.admin-service-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) auto; gap: 10px; }
+.admin-service-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) minmax(180px, 1fr) auto; gap: 10px; }
 .admin-service-form input, .admin-service-row input:not([type="checkbox"]) { min-width: 0; border: 1px solid #d6dee6; padding: 10px 12px; color: #17324f; background: #fff; border-radius: 7px; outline: none; font-size: 13px; }
 .admin-service-form button { border: 0; padding: 10px 18px; color: #fff; background: #06478f; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .admin-service-list { display: grid; gap: 8px; }
-.admin-service-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) auto; gap: 10px; align-items: center; padding-top: 9px; border-top: 1px solid #edf0f2; }
+.admin-service-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(140px, 200px) minmax(170px, auto) auto; gap: 10px; align-items: center; padding-top: 9px; border-top: 1px solid #edf0f2; }
 .admin-service-row label { color: #405268; font-size: 13px; white-space: nowrap; }
 .admin-service-row label input { margin-right: 6px; accent-color: #06478f; }
+.admin-service-upload { display: flex; width: fit-content; align-items: center; min-height: 36px; padding: 0 10px; border: 1px solid #cbd8e4; color: #075094 !important; background: #fff; border-radius: 6px; cursor: pointer; }
+.admin-service-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.admin-service-image-control { display: flex; align-items: center; gap: 8px; }
+.admin-service-image-preview { display: block; width: 48px; height: 38px; flex: 0 0 48px; object-fit: cover; border: 1px solid #e1e7ec; border-radius: 4px; }
+.admin-service-remove-image { border: 0; padding: 6px; color: #a43e3e; background: transparent; font-size: 12px; cursor: pointer; }
 .admin-header-actions { flex-wrap: wrap; }
 .admin-users-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 0 14px; color: #718096; font-size: 13px; }
 .admin-users-toolbar input { width: min(100%, 520px); border: 1px solid #d6dee6; padding: 11px 13px; color: #17324f; background: #fff; border-radius: 7px; outline: none; font-size: 13px; }
@@ -690,6 +695,7 @@ button {
 .service-copy strong { font-size: 15px; }
 .service-copy small { margin-top: 8px; color: #555; font-size: 14px; font-weight: 600; }
 .service-image { width: 79px; height: 43px; flex: 0 0 79px; border-radius: 3px; background-size: cover; background-position: center; }
+.service-image-uploaded { object-fit: cover; }
 .service-image-0 { background: linear-gradient(145deg, rgba(184, 216, 237, .65), rgba(127, 176, 154, .45)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=240&q=80'); }
 .service-image-1 { background: linear-gradient(145deg, #d8eff7, #92b8c5); }
 .service-image-2 { background: linear-gradient(145deg, #d9e6ef, #7692aa); }
@@ -732,6 +738,7 @@ button {
 .calendar-days button { display: grid; place-items: center; width: 32px; height: 32px; justify-self: center; border: 0; background: transparent; font-weight: 700; }
 .calendar-days button.selected { color: #111; background: #f1bb37; border-radius: 50%; }
 .calendar-days button:disabled { cursor: not-allowed; color: #c7c7c7; text-decoration: line-through; }
+.calendar-days button.booked:disabled { color: #b14b4b; background: #f9e4e4; border-radius: 50%; text-decoration: line-through; }
 .time-label { margin-top: 25px; }
 .time-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px 19px; }
 .time-grid button { border: 0; padding: 10px; color: #111; background: #ededee; border-radius: 9px; font-size: 14px; font-weight: 700; }
@@ -745,6 +752,13 @@ button {
 .customer-form label b { color: #df1919; }
 .customer-form input, .customer-form textarea { border: 0; padding: 13px 12px; color: #222; background: #f1f1f1; border-radius: 8px; outline: none; font-size: 14px; }
 .customer-form select { border: 0; padding: 13px 12px; color: #222; background: #f1f1f1; border-radius: 8px; outline: none; font-size: 14px; }
+.booking-account-info { display: grid; gap: 5px; padding: 14px; color: #405268; background: #fff; border: 1px solid #e1e7ec; border-radius: 8px; font-size: 13px; }
+.booking-account-info strong { color: #062b55; font-size: 14px; }
+.address-form-heading { margin: 16px 0 0; color: #17324f; font-size: 15px; }
+.address-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+.address-fields label { display: grid; min-width: 0; align-content: start; gap: 6px; }
+.address-fields input { width: 100%; min-width: 0; box-sizing: border-box; }
+.address-fields label:last-child { max-width: 220px; }
 .payment-slip-panel { display: grid; gap: 9px; margin-top: 16px; padding: 16px; background: #fff8df; border: 1px solid #f1d477; border-radius: 10px; }
 .payment-slip-panel p { margin: 0; color: #6b5a2a; font-size: 13px; }
 .payment-qr-code { width: 240px; height: 240px; margin: 4px auto; background: #fff; }
@@ -759,10 +773,16 @@ button {
 .customer-form .next-button:disabled { cursor: wait; opacity: 0.65; }
 .booking-error { margin: 5px 0 0; color: #b33b3b; font-size: 13px; line-height: 1.4; }
 
+@media (max-width: 560px) {
+  .address-fields { grid-template-columns: 1fr; }
+  .address-fields label:last-child { max-width: none; }
+}
+
 .booking-summary-header { display: flex; align-items: center; justify-content: space-between; color: #0a315f; font-size: 15px; line-height: 1.7; }
 .booking-summary-header span { padding: 10px 40px; color: #111; background: #f1bb37; border-radius: 9px; font-weight: 700; }
 .booking-summary-card { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 14px; background: #fff; border: 1px solid #e1e1e1; border-radius: 10px; }
 .summary-service-image { width: 94px; height: 70px; flex: 0 0 94px; border-radius: 7px; background-size: cover; background-position: center; }
+.summary-service-image-uploaded { object-fit: cover; }
 .booking-summary-card strong, .booking-summary-card small { display: block; }
 .booking-summary-card strong { color: #123d6d; font-size: 16px; }
 .booking-summary-card small { margin-top: 7px; color: #666; font-size: 13px; }
