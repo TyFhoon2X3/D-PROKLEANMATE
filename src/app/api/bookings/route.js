@@ -39,7 +39,7 @@ export async function POST(request) {
 
     const database = getDatabase();
     const [services] = await database.execute(
-      'SELECT name, starting_price, price FROM services WHERE name = ? AND is_active = TRUE',
+      'SELECT id, name, starting_price, price FROM services WHERE name = ? AND is_active = TRUE',
       [String(body.service_name || '')],
     );
     if (!services.length) return NextResponse.json({ error: 'ไม่พบบริการที่เลือก' }, { status: 400 });
@@ -50,9 +50,9 @@ export async function POST(request) {
     const orderNumber = `DP${Date.now()}${randomInt(1000, 10000)}`;
     const [result] = await database.execute(
       `INSERT INTO bookings
-        (order_number, user_id, service_name, service_price, site_visit_date, customer_name, customer_phone, customer_email, service_address, payment_method)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [orderNumber, user.id, service.name, service.starting_price || service.price, siteVisitDate, customerName, customerPhone, String(body.customer_email || user.email).trim() || null, serviceAddress, paymentMethod],
+        (order_number, user_id, service_id, service_name, service_price, site_visit_date, customer_name, customer_phone, customer_email, service_address, payment_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [orderNumber, user.id, service.id, service.name, service.starting_price || service.price, siteVisitDate, customerName, customerPhone, String(body.customer_email || user.email).trim() || null, serviceAddress, paymentMethod],
     );
     return NextResponse.json({ id: result.insertId, order_number: orderNumber }, { status: 201 });
   } catch (error) {

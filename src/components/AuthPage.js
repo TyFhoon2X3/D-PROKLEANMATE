@@ -55,6 +55,14 @@ export default function AuthPage({
       return;
     }
 
+    if (
+      isRegistering &&
+      (!fullName.trim() || !phone.trim() || !username.trim() || !confirmPassword)
+    ) {
+      setMessage({ type: "error", text: "กรุณากรอกข้อมูลสมัครสมาชิกให้ครบถ้วน" });
+      return;
+    }
+
     if (recoveryMode) {
       setIsLoading(true);
       const response = await fetch("/api/auth/forgot-password", {
@@ -207,6 +215,7 @@ export default function AuthPage({
                 type="text"
                 autoComplete="name"
                 placeholder="กรอกชื่อ-นามสกุล"
+                required
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
               />
@@ -216,6 +225,7 @@ export default function AuthPage({
                 type="tel"
                 autoComplete="tel"
                 placeholder="กรอกเบอร์โทรศัพท์"
+                required
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
               />
@@ -231,6 +241,7 @@ export default function AuthPage({
               recoveryMode ? "กรอกอีเมลที่ใช้ลงทะเบียน" : "กรอกอีเมล"
             }
             autoComplete="email"
+            required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
@@ -242,6 +253,7 @@ export default function AuthPage({
                 type="text"
                 autoComplete="username"
                 placeholder="กรอกชื่อผู้ใช้งาน (Username)"
+                required
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />
@@ -267,6 +279,7 @@ export default function AuthPage({
                   autoComplete={
                     isRegistering ? "new-password" : "current-password"
                   }
+                  required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
@@ -288,6 +301,7 @@ export default function AuthPage({
                       type={showPassword ? "text" : "password"}
                       placeholder="กรอกรหัสผ่านอีกครั้ง"
                       autoComplete="new-password"
+                      required
                       value={confirmPassword}
                       onChange={(event) =>
                         setConfirmPassword(event.target.value)

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   order_number VARCHAR(32) NOT NULL UNIQUE,
   user_id BIGINT UNSIGNED NOT NULL,
+  service_id BIGINT UNSIGNED NOT NULL,
   service_name VARCHAR(255) NOT NULL,
   service_price VARCHAR(255) NOT NULL,
   service_date DATE,
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   ) STORED,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT bookings_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT bookings_service_fk FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT,
   CONSTRAINT bookings_different_dates CHECK (
     site_visit_date IS NULL OR service_date IS NULL OR site_visit_date <> service_date
   ),

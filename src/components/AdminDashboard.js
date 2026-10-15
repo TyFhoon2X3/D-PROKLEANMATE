@@ -122,7 +122,7 @@ export default function AdminDashboard() {
 
   return (
     <main className="admin-page">
-      <header className="admin-header"><div><span className="admin-kicker">D-PROKLEANMATE</span><h1>ระบบผู้ดูแล</h1></div><div className="admin-header-actions"><Link href="/booking">ไปหน้าจองบริการ</Link><button type="button" onClick={signOut}>ออกจากระบบ</button></div></header>
+      <header className="admin-header"><div><span className="admin-kicker">D-PROKLEANMATE</span><h1>ระบบผู้ดูแล</h1></div><div className="admin-header-actions"><Link href="/admin/users">จัดการผู้ใช้</Link><Link href="/booking">ไปหน้าจองบริการ</Link><button type="button" onClick={signOut}>ออกจากระบบ</button></div></header>
       <section className="admin-content">
         <div className="admin-welcome"><div><h2>ภาพรวมการจอง</h2><p>จัดการรายการจองและอัปเดตสถานะบริการ</p></div><span className="admin-date">อัปเดตแบบเรียลไทม์</span></div>
         <div className="admin-stat-grid"><StatCard label="รายการทั้งหมด" value={bookings.length} /><StatCard label="ประเมินราคา" value={counts.quote || 0} accent="quote" /><StatCard label="รอชำระเงิน" value={counts.awaiting_payment || 0} accent="payment" /><StatCard label="ยืนยันแล้ว" value={counts.confirmed || 0} accent="confirmed" /></div>
