@@ -21,6 +21,7 @@ const slides = [
     description: '• บ้าน • คอนโด • สำนักงาน • Big Cleaning',
     subDescription: 'เลือกบริการ วัน และเวลาที่ต้องการได้ง่ายๆ',
     theme: 'navy',
+    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=900&q=85',
   },
 ];
 
@@ -37,7 +38,6 @@ export default function OnboardingPage() {
   return (
     <main className={`onboarding-page onboarding-${slide.theme}`}>
       {slide.image && <div className="onboarding-art" style={{ backgroundImage: `url(${slide.image})` }} aria-hidden="true" />}
-      {!slide.image && <div className="onboarding-art onboarding-art-placeholder" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span></div>}
       <section className="onboarding-copy">
         <div className="onboarding-logo"><span className="brand-shield"><span className="brand-roof" /></span><span>D-PROKLEANMATE</span></div>
         <h1>{slide.title}</h1>

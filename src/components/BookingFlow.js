@@ -223,11 +223,16 @@ export default function BookingFlow() {
   return (
     <main className="booking-page">
       <header className="booking-header">
-        <div className="booking-brand">
-          <span className="brand-shield"><span className="brand-roof" /></span>
+        <Link className="home-brand" href="/" aria-label="D-ProKleanMate หน้าแรก">
+          <span className="brand-shield" aria-hidden="true" />
           <span><strong>ดี-โปร คลีน แมท</strong><small>D-PRO KLEANMATE</small></span>
-        </div>
-        <button type="button" className="menu-button" aria-label="เปิดเมนู"><span /><span /><span /></button>
+        </Link>
+        <nav className="home-nav" aria-label="เมนูหลัก">
+          <Link href="/#services">บริการของเรา</Link>
+          <Link href="/#how-it-works">ขั้นตอนการจอง</Link>
+          <Link href="/login">เข้าสู่ระบบ</Link>
+          <Link className="home-nav-book" href="/booking">จองบริการ</Link>
+        </nav>
       </header>
 
       <section className="booking-content">
